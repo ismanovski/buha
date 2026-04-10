@@ -1,0 +1,956 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <title>Bankkontierung Sparkasse - BISLEY</title>
+  <style>
+    body { margin: 0; font-family: 'Segoe UI', Arial, sans-serif; background: #ebeff4; color: #1f2937; }
+    header { background: #232324; color: white; display: flex; justify-content: space-between; align-items: center; padding: 10px 18px; gap: 14px; }
+    .brand-logo { display: flex; align-items: center; text-decoration: none; flex-shrink: 0; }
+    .brand-logo img { display: block; height: clamp(63px, 6.3vw, 83px); width: auto; max-width: min(345px, 50vw); object-fit: contain; }
+    .brand-logo .name { font-size: 30px; font-weight: 900; letter-spacing: 0.16em; color: white; line-height: 1; }
+    .top-actions { display: flex; align-items: center; gap: 14px; justify-content: flex-end; }
+    .datetime { font-size: 13px; opacity: 0.85; white-space: nowrap; }
+    .clock {
+      width: 54px;
+      height: 54px;
+      position: relative;
+      border-radius: 50%;
+      background: radial-gradient(circle at 30% 30%, #3a3a3d, #1f1f22 65%, #141416 100%);
+      border: 2px solid rgba(255,255,255,0.18);
+      box-shadow:
+        inset 0 2px 6px rgba(255,255,255,0.08),
+        inset 0 -4px 8px rgba(0,0,0,0.35),
+        0 4px 12px rgba(0,0,0,0.25);
+    }
+    .clock::before,
+    .clock::after {
+      content: "";
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      background: rgba(255,255,255,0.18);
+      transform: translate(-50%, -50%);
+    }
+    .clock::before {
+      width: 2px;
+      height: 42px;
+      border-radius: 2px;
+    }
+    .clock::after {
+      width: 42px;
+      height: 2px;
+      border-radius: 2px;
+    }
+    .hand {
+      position: absolute;
+      left: 50%;
+      bottom: 50%;
+      transform-origin: bottom center;
+      border-radius: 999px;
+      transform: translateX(-50%) rotate(0deg);
+    }
+    .hour { width: 4px; height: 14px; background: #ffffff; }
+    .minute { width: 3px; height: 20px; background: #d1d5db; }
+    .second { width: 2px; height: 22px; background: #ff3b3b; }
+    .clock-center {
+      position: absolute;
+      width: 8px;
+      height: 8px;
+      background: #ffffff;
+      border-radius: 50%;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 5;
+      box-shadow: 0 0 0 2px #1f1f22;
+    }
+
+    @media (max-width: 700px) {
+      header { padding: 8px 12px; }
+      .brand-logo img { height: clamp(38px, 7vw, 50px); max-width: 46vw; }
+      .brand-logo .name { font-size: 24px; }
+      .top-actions { gap: 10px; }
+      .clock { width: 48px; height: 48px; }
+    }
+
+    .container { max-width: 1300px; margin: 22px auto; padding: 0 18px; }
+    .headline { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+    .headline h1 { margin: 0; font-size: 2.1rem; letter-spacing: 0.1em; color: #151718; }
+    .headline .subtitle { font-size: 0.95rem; color: #4b5563; }
+
+    .control-panel { background: white; border-radius: 18px; border: 1px solid #cbd5e1; padding: 14px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 14px; box-shadow: 0 3px 15px rgba(0,0,0,0.05); }
+    .control-panel label { font-size: 14px; font-weight: 700; }
+    .control-panel input[type="file"], .control-panel input, .control-panel button { border-radius: 10px; padding: 10px 13px; font-size: 13px; border: 1px solid #94a3b8; }
+    .control-panel button { background: #e8f1f9; color: #0f172a; font-weight: 800; }
+    .control-panel button:hover:not(:disabled) { background: #dbe8f1; }
+    .control-panel button:disabled { background: #cfd7e0; color: #64748b; cursor: not-allowed; }
+
+
+    .rules-panel { background: white; border: 1px solid #cbd5e1; border-radius: 10px; padding: 12px; margin-bottom: 14px; max-width: 100%; }
+    .rules-panel.hidden { display: none; }
+    .rules-list { max-height: 170px; overflow-y: auto; margin-top: 8px; border: 1px solid #cbd5e1; border-radius: 8px; padding: 6px; background: #f1f5f9; }
+    .rules-list div { display: flex; justify-content: space-between; align-items: center; padding: 6px; border-bottom: 1px solid #e2e8f0; }
+
+    table { width: 100%; border-collapse: collapse; border-radius: 12px; overflow: hidden; }
+    th, td { border-bottom: 1px solid #cbd5e1; padding: 10px 9px; font-size: 13px; }
+    th { background: #f1f5f9; text-align: left; color: #0f172a; font-weight: 700; }
+    td { background: #ffffff; }
+    tr:hover td { background: #f7f8fb; }
+    td input { width: 100%; padding: 6px; border: 1px solid #94a3b8; border-radius: 6px; }
+    td button { border: none; background: #111827; color: white; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; }
+    .amount-positive { color: #16a34a; font-weight: 700; }
+    .amount-negative { color: #dc2626; font-weight: 700; }
+
+    #status { min-height: 20px; margin: 8px 0 10px; font-size: 13px; font-weight: 700; }
+    #status.success { color: #16a34a; }
+    #status.error { color: #dc2626; }
+
+    .info-box { background: #fff8eb; border: 1px solid #facc15; border-radius: 10px; padding: 12px; margin-top: 6px; font-size: 13px; }
+
+    .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(17, 24, 39, 0.6); display: flex; justify-content: center; align-items: center; z-index: 999; }
+    .modal.hidden { display: none; }
+    .modal-content { background: white; border-radius: 12px; padding: 20px; width: min(520px, 95vw); box-shadow: 0 6px 18px rgba(15,23,42,.3); }
+    .modal-content h3 { margin-top: 0; }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px; }
+    .small-btn { background: #6b7280; color: white; border-radius: 6px; border: none; padding: 6px 10px; cursor: pointer; }
+    .small-btn:hover { background: #4b5563; }
+    .export-options { display: grid; gap: 8px; margin-top: 12px; }
+    .export-options label { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 8px; cursor: pointer; }
+    .export-options label:hover { background: #f8fafc; }
+
+    @media print {
+      body * { visibility: hidden; }
+      #print-area, #print-area * { visibility: visible; }
+      #print-area {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        box-sizing: border-box;
+        background: #ffffff;
+      }
+      #print-area table { table-layout: fixed; width: 100%; border-collapse: collapse; }
+      #print-area th, #print-area td { font-size: 10.5px; word-break: break-word; padding: 7px 8px; line-height: 1.2; border-bottom: 1px solid #cbd5e1; }
+      #print-area th { background: #f1f5f9; color: #0f172a; }
+      #print-area td { background: #ffffff; }
+      #print-area tr:last-child td { border-bottom: none; }
+      #print-area .no-print,
+      #print-area th:last-child,
+      #print-area td:last-child {
+        display: none !important;
+      }
+      @page { size: A4 portrait; margin: 3.0cm 1.6cm; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <a href="/" class="brand-logo" aria-label="Zur Startseite">
+      <img id="bisleyLogoSpk" src="/static/BISLEY_LOGO.png" alt="BISLEY Logo" onerror="this.style.display='none'; document.getElementById('bisleyFallbackSpk').style.display='block';">
+      <div id="bisleyFallbackSpk" class="name" style="display:none;">BISLEY</div>
+    </a>
+    <div class="top-actions">
+      <div class="datetime" id="dateTime"></div>
+      <div class="clock">
+        <div class="clock-center"></div>
+        <div class="hand hour" id="hourHand"></div>
+        <div class="hand minute" id="minuteHand"></div>
+        <div class="hand second" id="secondHand"></div>
+      </div>
+    </div>
+  </header>
+
+  <div class="container">
+    <div class="headline">
+      <h1>Bank Kontierung SPK</h1>
+      <div class="subtitle">Sparkassen-Auszüge verarbeiten, Regeln anwenden, Buchungshinweise speichern</div>
+    </div>
+    <div class="control-panel">
+      <label>CSV-Auszug (Sparkasse)</label>
+      <input type="file" id="csvfile" accept=".csv">
+      <button id="uploadBtn">CSV analysieren</button>
+      <button id="manageRulesBtn">Regel hinzufügen</button>
+      <button id="manageRulesListBtn">Regeln verwalten</button>
+      <button id="exportBtn" disabled>Exportieren</button>
+      <button id="printBtn" disabled>Drucken</button>
+      <button id="finalSaveBtn" disabled>Alle Hinweise speichern</button>
+    </div>
+
+    <div id="rulesPanel" class="rules-panel hidden">
+      <strong>Neue Regel anlegen (hinter den Kulissen)</strong>
+      <div style="margin-top:8px; display:grid; grid-template-columns: 1fr 1fr 1fr; gap:8px; align-items:center;">
+        <select id="ruleColumn" style="padding:9px; border-radius:6px;">
+          <option value="buchungstext">Spalte C = Buchungstext</option>
+          <option value="verwendungszweck">Spalte B = Verwendungszweck</option>
+          <option value="beguenstigter">Spalte D = Begünstigter</option>
+        </select>
+        <select id="ruleCondition" style="padding:9px; border-radius:6px;">
+          <option value="equals">Ist gleich</option>
+          <option value="contains">Enthält</option>
+        </select>
+        <input id="ruleValue" placeholder="Vergleichswert" style="padding:9px; border-radius:6px;" />
+      </div>
+      <label style="margin-top:8px; display:flex; align-items:center; gap:8px; font-size:13px;">
+        <input type="checkbox" id="useSecondCondition">
+        Zweite Bedingung (UND) hinzufügen
+      </label>
+      <div id="secondConditionRow" style="margin-top:8px; display:none; grid-template-columns: 1fr 1fr 1fr; gap:8px; align-items:center;">
+        <select id="secondRuleColumn" style="padding:9px; border-radius:6px;">
+          <option value="buchungstext">Spalte C = Buchungstext</option>
+          <option value="verwendungszweck">Spalte B = Verwendungszweck</option>
+          <option value="beguenstigter">Spalte D = Begünstigter</option>
+        </select>
+        <select id="secondRuleCondition" style="padding:9px; border-radius:6px;">
+          <option value="equals">Ist gleich</option>
+          <option value="contains">Enthält</option>
+        </select>
+        <input id="secondRuleValue" placeholder="2. Vergleichswert" style="padding:9px; border-radius:6px;" />
+      </div>
+      <div style="margin-top:8px; display:grid; grid-template-columns: 1fr 1fr; gap:8px; align-items:center;">
+        <input id="ruleHint" placeholder="Hinweis (z.B. 1745/0)" style="padding:9px; border-radius:6px;" />
+        <input id="ruleDescription" placeholder="Beschreibung (z.B. RM telefon)" style="padding:9px; border-radius:6px;" />
+      </div>
+      <div style="margin-top:8px; display:flex; justify-content:flex-end;">
+        <button id="saveRuleBtn" class="small-btn">Regel speichern</button>
+      </div>
+      <small>Diese feste Regel wird in Zukunft automatisch in Hinweis + Beschreibung angewendet.</small>
+    </div>
+
+    <div id="rulesListPanel" class="rules-panel hidden">
+      <strong>Alle Regeln verwalten</strong>
+      <div class="rules-list" id="rulesListContainer"></div>
+    </div>
+
+    <div id="status"></div>
+
+    <div id="editRuleModal" class="modal hidden">
+      <div class="modal-content">
+        <h3>Regel bearbeiten</h3>
+        <div style="margin-top:8px; display:grid; grid-template-columns: 1fr 1fr 1fr; gap:8px; align-items:center;">
+          <select id="editRuleColumn" style="padding:9px; border-radius:6px;">
+            <option value="buchungstext">Spalte C = Buchungstext</option>
+            <option value="verwendungszweck">Spalte B = Verwendungszweck</option>
+            <option value="beguenstigter">Spalte D = Begünstigter</option>
+          </select>
+          <select id="editRuleCondition" style="padding:9px; border-radius:6px;">
+            <option value="equals">Ist gleich</option>
+            <option value="contains">Enthält</option>
+          </select>
+          <input id="editRuleValue" placeholder="Vergleichswert" style="padding:9px; border-radius:6px;" />
+        </div>
+        <label style="margin-top:8px; display:flex; align-items:center; gap:8px; font-size:13px;">
+          <input type="checkbox" id="editUseSecondCondition">
+          Zweite Bedingung (UND) hinzufügen
+        </label>
+        <div id="editSecondConditionRow" style="margin-top:8px; display:none; grid-template-columns: 1fr 1fr 1fr; gap:8px; align-items:center;">
+          <select id="editSecondRuleColumn" style="padding:9px; border-radius:6px;">
+            <option value="buchungstext">Spalte C = Buchungstext</option>
+            <option value="verwendungszweck">Spalte B = Verwendungszweck</option>
+            <option value="beguenstigter">Spalte D = Begünstigter</option>
+          </select>
+          <select id="editSecondRuleCondition" style="padding:9px; border-radius:6px;">
+            <option value="equals">Ist gleich</option>
+            <option value="contains">Enthält</option>
+          </select>
+          <input id="editSecondRuleValue" placeholder="2. Vergleichswert" style="padding:9px; border-radius:6px;" />
+        </div>
+        <div style="margin-top:8px; display:grid; grid-template-columns: 1fr 1fr; gap:8px; align-items:center;">
+          <input id="editRuleHint" placeholder="Hinweis" style="padding:9px; border-radius:6px;" />
+          <input id="editRuleDescription" placeholder="Beschreibung" style="padding:9px; border-radius:6px;" />
+        </div>
+        <div class="modal-actions">
+          <button id="cancelEditBtn" class="small-btn">Abbrechen</button>
+          <button id="saveEditBtn" class="small-btn">Speichern</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="print-area">
+      <table id="transaction-table" class="hidden">
+        <thead>
+          <tr>
+            <th>Begünstigter</th>
+            <th>Buchungstext</th>
+            <th>Verwendungszweck</th>
+            <th>Datum</th>
+            <th>Betrag</th>
+            <th>Beschreibung</th>
+            <th>Hinweis</th>
+            <th class="no-print">Aktion</th>
+          </tr>
+        </thead>
+        <tbody id="tx-body"></tbody>
+      </table>
+    </div>
+
+    <div id="exportModal" class="modal hidden">
+      <div class="modal-content">
+        <h3>Exportformat auswählen</h3>
+        <div class="export-options">
+          <label><input type="radio" name="exportFormatChoice" value="csv" checked> CSV</label>
+          <label><input type="radio" name="exportFormatChoice" value="xml"> XML</label>
+          <label><input type="radio" name="exportFormatChoice" value="jpg"> JPG</label>
+        </div>
+        <div class="modal-actions">
+          <button id="cancelExportBtn" class="small-btn">Abbrechen</button>
+          <button id="confirmExportBtn" class="small-btn">Export starten</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const base = location.origin;
+    const dateTimeEl = document.getElementById('dateTime');
+    const uploadBtn = document.getElementById('uploadBtn');
+    const exportBtn = document.getElementById('exportBtn');
+    const printBtn = document.getElementById('printBtn');
+    const finalSaveBtn = document.getElementById('finalSaveBtn');
+    const txBody = document.getElementById('tx-body');
+    const txTable = document.getElementById('transaction-table');
+    const statusBox = document.getElementById('status');
+    const exportFormat = document.getElementById('exportFormat');
+
+    let currentTransactions = [];
+
+    function translateRule(rule) {
+      const columnMap = {
+        'buchungstext': 'Buchungstext',
+        'verwendungszweck': 'Verwendungszweck',
+        'beguenstigter': 'Begünstigter'
+      };
+      const conditionMap = {
+        'equals': 'ist gleich',
+        'contains': 'enthält'
+      };
+      return {
+        column: columnMap[rule.column] || rule.column,
+        condition: conditionMap[rule.condition] || rule.condition,
+        value: rule.value,
+        result_hint: rule.result_hint,
+        result_description: rule.result_description
+      };
+    }
+
+    async function fetchRules() {
+      const response = await fetch(base + '/rules');
+      if (!response.ok) throw new Error('Regeln konnten nicht geladen werden.');
+      return await response.json();
+    }
+
+    async function loadRulesList() {
+      const container = document.getElementById('rulesListContainer');
+      container.innerHTML = '<div>Lade Regeln...</div>';
+      try {
+        const rules = await fetchRules();
+        container.innerHTML = '';
+        if (!rules.length) {
+          container.innerHTML = '<div>Keine Regeln vorhanden.</div>';
+          return;
+        }
+        rules.forEach(rule => {
+          const translatedRule = translateRule(rule);
+          const row = document.createElement('div');
+          row.style.display = 'flex';
+          row.style.justifyContent = 'space-between';
+          row.style.alignItems = 'center';
+          row.style.padding = '8px';
+          row.style.borderBottom = '1px solid #e2e8f0';
+          row.innerHTML = `
+            <span>${translatedRule.column} ${translatedRule.condition} "${translatedRule.value}"${translatedRule.secondText} → Hinweis: "${translatedRule.result_hint}" ${translatedRule.result_description ? `Beschreibung: "${translatedRule.result_description}"` : ''}</span>
+            <div>
+              <button class="small-btn" onclick="editRule('${rule.id}')">Bearbeiten</button>
+              <button class="small-btn" onclick="deleteRule('${rule.id}')">Löschen</button>
+            </div>
+          `;
+          container.appendChild(row);
+        });
+      } catch (e) {
+        container.innerHTML = '<div>Fehler beim Laden der Regeln.</div>';
+        setStatus('Fehler: ' + e.message, 'error');
+      }
+    }
+
+    async function editRule(ruleId) {
+      try {
+        const rules = await fetchRules();
+        const rule = rules.find(r => r.id === ruleId);
+        if (!rule) throw new Error('Regel nicht gefunden.');
+        const hasSecond = !!(rule.second_column && rule.second_condition && rule.second_value);
+        document.getElementById('editRuleColumn').value = rule.column;
+        document.getElementById('editRuleCondition').value = rule.condition;
+        document.getElementById('editRuleValue').value = rule.value;
+        document.getElementById('editUseSecondCondition').checked = hasSecond;
+        document.getElementById('editSecondRuleColumn').value = rule.second_column || 'buchungstext';
+        document.getElementById('editSecondRuleCondition').value = rule.second_condition || 'equals';
+        document.getElementById('editSecondRuleValue').value = rule.second_value || '';
+        toggleEditSecondConditionFields();
+        document.getElementById('editRuleHint').value = rule.result_hint;
+        document.getElementById('editRuleDescription').value = rule.result_description || '';
+        document.getElementById('editRuleModal').dataset.ruleId = ruleId;
+        document.getElementById('editRuleModal').classList.remove('hidden');
+      } catch (e) {
+        setStatus('Fehler: ' + e.message, 'error');
+      }
+    }
+
+    async function deleteRule(ruleId) {
+      if (!confirm('Regel wirklich löschen?')) return;
+      try {
+        const response = await fetch(base + '/rules/' + ruleId, {method: 'DELETE'});
+        if (!response.ok) throw new Error('Löschen fehlgeschlagen');
+        setStatus('Regel gelöscht.', 'success');
+        loadRulesList();
+      } catch (e) {
+        setStatus('Fehler: ' + e.message, 'error');
+      }
+    }
+
+    function updateDateTime() {
+      const now = new Date();
+
+      const date = now.toLocaleDateString('de-DE', {
+        weekday: 'short',
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+      });
+
+      dateTimeEl.textContent = date;
+
+      const seconds = now.getSeconds();
+      const minutes = now.getMinutes();
+      const hours = now.getHours();
+
+      const secondDeg = seconds * 6;
+      const minuteDeg = minutes * 6 + seconds * 0.1;
+      const hourDeg = (hours % 12) * 30 + minutes * 0.5;
+
+      document.getElementById('secondHand').style.transform =
+        `translateX(-50%) rotate(${secondDeg}deg)`;
+
+      document.getElementById('minuteHand').style.transform =
+        `translateX(-50%) rotate(${minuteDeg}deg)`;
+
+      document.getElementById('hourHand').style.transform =
+        `translateX(-50%) rotate(${hourDeg}deg)`;
+    }
+    updateDateTime();
+    setInterval(updateDateTime, 1000);
+
+    function setStatus(msg, type='') {
+      statusBox.textContent = msg;
+      statusBox.className = type;
+    }
+
+    function escapeHtml(value) {
+      return String(value || '').replace(/[&<>"']/g, char => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+      }[char]));
+    }
+
+    function getExportRows() {
+      return currentTransactions.map(tx => ({
+        beguenstigter: tx.beguenstigter || '',
+        buchungstext: tx.buchungstext || '',
+        verwendungszweck: tx.verwendungszweck || '',
+        buchungstag: tx.buchungstag || '',
+        betrag: tx.betrag || '',
+        beschreibung: tx.beschreibung || '',
+        hinweis: tx.hinweis || ''
+      }));
+    }
+
+    function getPrintableTableHtml() {
+      const clone = txTable.cloneNode(true);
+      clone.classList.remove('hidden');
+      clone.removeAttribute('id');
+      clone.querySelectorAll('.no-print').forEach(el => el.remove());
+      clone.querySelectorAll('input').forEach(input => {
+        const span = document.createElement('span');
+        span.textContent = input.value || '';
+        input.replaceWith(span);
+      });
+      return clone.outerHTML;
+    }
+
+    function buildPrintableDocument(title) {
+      const tableHtml = getPrintableTableHtml();
+
+      return `<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>${escapeHtml(title)}</title>
+  <style>
+    body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; color: #1f2937; background: #ffffff; }
+    .print-wrap { padding: 0; box-sizing: border-box; }
+    h1 { margin: 0 0 14px; font-size: 18px; color: #111827; }
+    .table-wrap { border: 1px solid #cbd5e1; border-radius: 12px; overflow: hidden; }
+    table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+    th, td { border-bottom: 1px solid #cbd5e1; padding: 7px 8px; font-size: 10.5px; text-align: left; vertical-align: top; word-break: break-word; line-height: 1.2; }
+    th { background: #f1f5f9; color: #0f172a; font-weight: 700; }
+    td { background: #ffffff; color: #1f2937; }
+    tr:last-child td { border-bottom: none; }
+    span { display: block; min-height: 14px; }
+    .amount-positive, .pos { color: #16a34a; font-weight: 700; }
+    .amount-negative, .neg { color: #dc2626; font-weight: 700; }
+    @page { size: A4 portrait; margin: 3.0cm 1.6cm; }
+  </style>
+</head>
+<body>
+  <div class="print-wrap">
+    <h1>${escapeHtml(title)}</h1>
+    <div class="table-wrap">${tableHtml}</div>
+  </div>
+</body>
+</html>`;
+    }
+
+    function openPrintView(title, autoPrint = true) {
+      const printWindow = window.open('', '_blank', 'width=1200,height=900');
+      if (!printWindow) {
+        throw new Error('Bitte Pop-ups für den Druck oder PDF-Export erlauben.');
+      }
+      printWindow.document.open();
+      printWindow.document.write(buildPrintableDocument(title));
+      printWindow.document.close();
+      if (autoPrint) {
+        printWindow.onload = () => {
+          printWindow.focus();
+          printWindow.print();
+        };
+      }
+    }
+
+    function renderTable() {
+      txBody.innerHTML = '';
+      if (!currentTransactions.length) { txTable.classList.add('hidden'); return; }
+      currentTransactions.forEach((tx, idx) => {
+        const tr = document.createElement('tr');
+        const amountText = String(tx.betrag || '').trim();
+        const amountClass = amountText.startsWith('-') ? 'amount-negative' : 'amount-positive';
+        tr.innerHTML = `
+          <td>${tx.beguenstigter}</td>
+          <td>${tx.buchungstext}</td>
+          <td>${tx.verwendungszweck}</td>
+          <td>${tx.buchungstag}</td>
+          <td class="${amountClass}">${tx.betrag}</td>
+          <td><input data-idx="${idx}" data-field="beschreibung" value="${tx.beschreibung || ''}"></td>
+          <td><input data-idx="${idx}" data-field="hinweis" value="${tx.hinweis || ''}"></td>
+          <td class="no-print"><button data-idx="${idx}" class="save-row">Speichern</button></td>
+        `;
+        txBody.appendChild(tr);
+      });
+      txTable.classList.remove('hidden');
+    }
+
+    async function loadCorrections() {
+      const response = await fetch(base + '/memory');
+      if (!response.ok) return;
+      const data = await response.json();
+      return data.corrections || {};
+    }
+
+    async function applySavedCorrections() {
+      const corrections = await loadCorrections();
+      currentTransactions = currentTransactions.map(tx => {
+        let saved = corrections[tx.beguenstigter];
+        if (!saved && !tx.beguenstigter) {
+          // Wenn kein Begünstigter, versuche mit Buchungstext
+          saved = corrections[tx.buchungstext];
+        }
+        if (saved) {
+          return {...tx, hinweis: saved.hinweis || tx.hinweis || '', beschreibung: saved.beschreibung || tx.beschreibung || ''};
+        }
+        return {...tx, hinweis: tx.hinweis || '', beschreibung: tx.beschreibung || ''};
+      });
+      renderTable();
+    }
+
+    async function applyRules() {
+      const rules = await fetchRules();
+      currentTransactions = currentTransactions.map(tx => {
+        let hinweis = tx.hinweis || '';
+        let beschreibung = tx.beschreibung || '';
+        for (const rule of rules) {
+          const fieldValue = tx[rule.column];
+          if (!fieldValue) continue;
+          let matches = false;
+          if (rule.condition === 'equals') {
+            matches = fieldValue.toLowerCase() === rule.value.toLowerCase();
+          } else if (rule.condition === 'contains') {
+            matches = fieldValue.toLowerCase().includes(rule.value.toLowerCase());
+          }
+          if (matches) {
+            hinweis = rule.result_hint;
+            if (rule.result_description) {
+              beschreibung = rule.result_description;
+            }
+            break; // Erste passende Regel anwenden
+          }
+        }
+        return {...tx, hinweis, beschreibung};
+      });
+      renderTable();
+    }
+
+    async function fetchRules() {
+      try {
+        const response = await fetch(base + '/rules');
+        if (!response.ok) return [];
+        const result = await response.json();
+        return result.rules || [];
+      } catch {
+        return [];
+      }
+    }
+
+    function translateRule(rule) {
+      const columnMap = {
+        'buchungstext': 'Buchungstext',
+        'verwendungszweck': 'Verwendungszweck',
+        'beguenstigter': 'Begünstigter'
+      };
+      const conditionMap = {
+        'equals': 'ist gleich',
+        'contains': 'enthält'
+      };
+      const secondText = rule.second_column && rule.second_condition && rule.second_value
+        ? ` UND ${columnMap[rule.second_column] || rule.second_column} ${conditionMap[rule.second_condition] || rule.second_condition} "${rule.second_value}"`
+        : '';
+      return {
+        column: columnMap[rule.column] || rule.column,
+        condition: conditionMap[rule.condition] || rule.condition,
+        value: rule.value,
+        secondText,
+        result_hint: rule.result_hint,
+        result_description: rule.result_description
+      };
+    }
+
+    function toggleSecondConditionFields() {
+      const enabled = document.getElementById('useSecondCondition').checked;
+      const row = document.getElementById('secondConditionRow');
+      row.style.display = enabled ? 'grid' : 'none';
+      if (!enabled) document.getElementById('secondRuleValue').value = '';
+    }
+
+    function toggleEditSecondConditionFields() {
+      const enabled = document.getElementById('editUseSecondCondition').checked;
+      const row = document.getElementById('editSecondConditionRow');
+      row.style.display = enabled ? 'grid' : 'none';
+      if (!enabled) document.getElementById('editSecondRuleValue').value = '';
+    }
+
+    async function editRule(ruleId) {
+      try {
+        const rules = await fetchRules();
+        const rule = rules.find(r => r.id === ruleId);
+        if (!rule) throw new Error('Regel nicht gefunden');
+        const hasSecond = !!(rule.second_column && rule.second_condition && rule.second_value);
+        document.getElementById('editRuleColumn').value = rule.column;
+        document.getElementById('editRuleCondition').value = rule.condition;
+        document.getElementById('editRuleValue').value = rule.value;
+        document.getElementById('editUseSecondCondition').checked = hasSecond;
+        document.getElementById('editSecondRuleColumn').value = rule.second_column || 'buchungstext';
+        document.getElementById('editSecondRuleCondition').value = rule.second_condition || 'equals';
+        document.getElementById('editSecondRuleValue').value = rule.second_value || '';
+        toggleEditSecondConditionFields();
+        document.getElementById('editRuleHint').value = rule.result_hint;
+        document.getElementById('editRuleDescription').value = rule.result_description || '';
+        document.getElementById('editRuleModal').dataset.ruleId = ruleId;
+        document.getElementById('editRuleModal').classList.remove('hidden');
+      } catch (e) {
+        setStatus('Fehler: ' + e.message, 'error');
+      }
+    }
+
+    async function deleteRule(ruleId) {
+      if (!confirm('Regel wirklich löschen?')) return;
+      try {
+        const response = await fetch(base + '/rules/' + ruleId, {method: 'DELETE'});
+        if (!response.ok) throw new Error('Löschen fehlgeschlagen');
+        setStatus('Regel gelöscht.', 'success');
+        loadRulesList();
+      } catch (e) {
+        setStatus('Fehler: ' + e.message, 'error');
+      }
+    }
+
+    document.getElementById('useSecondCondition').addEventListener('change', toggleSecondConditionFields);
+    document.getElementById('editUseSecondCondition').addEventListener('change', toggleEditSecondConditionFields);
+    toggleSecondConditionFields();
+    toggleEditSecondConditionFields();
+
+    document.getElementById('cancelEditBtn').addEventListener('click', () => {
+      document.getElementById('editRuleModal').classList.add('hidden');
+    });
+
+    document.getElementById('saveEditBtn').addEventListener('click', async () => {
+      const ruleId = document.getElementById('editRuleModal').dataset.ruleId;
+      const column = document.getElementById('editRuleColumn').value;
+      const condition = document.getElementById('editRuleCondition').value;
+      const value = document.getElementById('editRuleValue').value.trim();
+      const useSecond = document.getElementById('editUseSecondCondition').checked;
+      const second_column = useSecond ? document.getElementById('editSecondRuleColumn').value : null;
+      const second_condition = useSecond ? document.getElementById('editSecondRuleCondition').value : null;
+      const second_value = useSecond ? document.getElementById('editSecondRuleValue').value.trim() : null;
+      const result_hint = document.getElementById('editRuleHint').value.trim();
+      const result_description = document.getElementById('editRuleDescription').value.trim();
+      if (!value || !result_hint) { setStatus('Vergleichswert und Hinweis sind erforderlich.', 'error'); return; }
+      if (useSecond && !second_value) { setStatus('Bitte den zweiten Vergleichswert eingeben.', 'error'); return; }
+      try {
+        const response = await fetch(base + '/rules/' + ruleId, {method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({column, condition, value, second_column, second_condition, second_value, result_hint, result_description})});
+        if (!response.ok) throw new Error('Speichern fehlgeschlagen');
+        setStatus('Regel aktualisiert.', 'success');
+        document.getElementById('editRuleModal').classList.add('hidden');
+        loadRulesList();
+      } catch (e) {
+        setStatus('Fehler: ' + e.message, 'error');
+      }
+    });
+
+    document.getElementById('manageRulesBtn').addEventListener('click', () => {
+      const panel = document.getElementById('rulesPanel');
+      panel.classList.toggle('hidden');
+      if (!panel.classList.contains('hidden')) {
+        setStatus('Neue Regel anlegen. Bestehende Regeln bleiben im Hintergrund gespeichert.', 'success');
+      }
+    });
+
+    document.getElementById('manageRulesListBtn').addEventListener('click', () => {
+      const panel = document.getElementById('rulesListPanel');
+      panel.classList.toggle('hidden');
+      if (!panel.classList.contains('hidden')) {
+        loadRulesList();
+      }
+    });
+
+    document.getElementById('saveRuleBtn').addEventListener('click', async () => {
+      const column = document.getElementById('ruleColumn').value;
+      const condition = document.getElementById('ruleCondition').value;
+      const value = document.getElementById('ruleValue').value.trim();
+      const useSecond = document.getElementById('useSecondCondition').checked;
+      const second_column = useSecond ? document.getElementById('secondRuleColumn').value : null;
+      const second_condition = useSecond ? document.getElementById('secondRuleCondition').value : null;
+      const second_value = useSecond ? document.getElementById('secondRuleValue').value.trim() : null;
+      const result_hint = document.getElementById('ruleHint').value.trim();
+      const result_description = document.getElementById('ruleDescription').value.trim();
+      if (!value || !result_hint) { setStatus('Vergleichswert und Hinweis sind erforderlich.', 'error'); return; }
+      if (useSecond && !second_value) { setStatus('Bitte den zweiten Vergleichswert eingeben.', 'error'); return; }
+      try {
+        const response = await fetch(base + '/rules', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({column, condition, value, second_column, second_condition, second_value, result_hint, result_description})});
+        if (!response.ok) {
+          const obj = await response.json();
+          throw new Error(obj.detail || 'Regel konnte nicht gespeichert werden.');
+        }
+        setStatus('Regel gespeichert. Wird künftig automatisch beim Upload angewendet.', 'success');
+        document.getElementById('ruleValue').value = '';
+        document.getElementById('ruleHint').value = '';
+        document.getElementById('ruleDescription').value = '';
+        document.getElementById('useSecondCondition').checked = false;
+        document.getElementById('secondRuleValue').value = '';
+        toggleSecondConditionFields();
+      } catch (e) {
+        setStatus('Fehler: '+e.message, 'error');
+      }
+    });
+
+    uploadBtn.addEventListener('click', async () => {
+      const fileInput = document.getElementById('csvfile');
+      if (!fileInput.files.length) { setStatus('Bitte wähle eine CSV-Datei aus.', 'error'); return; }
+      setStatus('CSV wird analysiert...', '');
+      const formData = new FormData();
+      formData.append('file', fileInput.files[0]);
+
+      try {
+        const response = await fetch(base + '/parse', {method:'POST', body:formData});
+        if (!response.ok) {
+          let err = {};
+          try { err = await response.json(); } catch {}
+          throw new Error(err.detail || err.error || 'Fehler beim CSV-Upload');
+        }
+        const body = await response.json();
+        if (!body || !Array.isArray(body.transactions)) {
+          throw new Error('Der Server hat keine gültigen Buchungen zurückgegeben.');
+        }
+        currentTransactions = body.transactions.map(tx=>({ ...tx, beschreibung: tx.beschreibung || '', hinweis: tx.hinweis || '' }));
+        await applySavedCorrections();
+        await applyRules();
+        setStatus(`CSV geprüft. ${body.row_count} Einträge geladen.`, 'success');
+        exportBtn.disabled=false; printBtn.disabled=false; finalSaveBtn.disabled=false;
+      } catch (e) {
+        setStatus('Fehler: '+e.message, 'error');
+      }
+    });
+
+    txBody.addEventListener('input', event => {
+      if (event.target.tagName !== 'INPUT') return;
+      const idx = Number(event.target.dataset.idx);
+      const field = event.target.dataset.field;
+      currentTransactions[idx][field] = event.target.value;
+    });
+
+    txBody.addEventListener('click', async event => {
+      if (!event.target.classList.contains('save-row')) return;
+      const idx = Number(event.target.dataset.idx);
+      const tx = currentTransactions[idx];
+      try {
+        const key = tx.beguenstigter || tx.buchungstext;
+        const label = tx.beguenstigter ? `Begünstigter ${tx.beguenstigter}` : `Buchungstext ${tx.buchungstext}`;
+        const body = {hinweis: tx.hinweis, beschreibung: tx.beschreibung};
+        if (tx.beguenstigter) body.beguenstigter = tx.beguenstigter;
+        else body.buchungstext = tx.buchungstext;
+        const response = await fetch(base + '/save-correction', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+        if (!response.ok) throw new Error('Speichern fehlgeschlagen');
+        setStatus(`Hinweis für ${label} gespeichert.`, 'success');
+      } catch (e) {
+        setStatus('Fehler: '+e.message, 'error');
+      }
+    });
+
+    finalSaveBtn.addEventListener('click', async () => {
+      const corrections = {};
+      currentTransactions.forEach(tx => {
+        const key = tx.beguenstigter || tx.buchungstext;
+        if (key) corrections[key] = {hinweis: tx.hinweis || '', beschreibung: tx.beschreibung || ''};
+      });
+      try {
+        const response = await fetch(base + '/save-corrections', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({corrections})});
+        if (!response.ok) throw new Error('Speichern fehlgeschlagen');
+        setStatus('Alle Hinweise gespeichert und werden bei zukünftigen Auszügen angewendet.', 'success');
+      } catch (e) {
+        setStatus('Fehler: '+e.message, 'error');
+      }
+    });
+
+    exportBtn.addEventListener('click', () => {
+      if (!currentTransactions.length) {
+        setStatus('Bitte zuerst eine CSV analysieren.', 'error');
+        return;
+      }
+      document.getElementById('exportModal').classList.remove('hidden');
+    });
+
+    document.getElementById('cancelExportBtn').addEventListener('click', () => {
+      document.getElementById('exportModal').classList.add('hidden');
+    });
+
+    document.getElementById('confirmExportBtn').addEventListener('click', () => {
+      const selected = document.querySelector('input[name="exportFormatChoice"]:checked');
+      if (!selected) {
+        setStatus('Bitte ein Exportformat auswählen.', 'error');
+        return;
+      }
+
+      const choice = selected.value;
+      const rows = getExportRows();
+      let blob = null;
+      let filename = '';
+
+      const escapeXml = str => String(str || '').replace(/[<>&"']/g, m => ({'<':'&lt;', '>':'&gt;', '&':'&amp;', '"':'&quot;', "'":'&apos;'}[m]));
+
+      if (choice === 'csv') {
+        let csv = 'Beguenstigter;Buchungstext;Verwendungszweck;Datum;Betrag;Beschreibung;Hinweis\n';
+        rows.forEach(tx => {
+          const esc = s => '"' + String(s || '').replace(/"/g, '""') + '"';
+          csv += [tx.beguenstigter, tx.buchungstext, tx.verwendungszweck, tx.buchungstag, tx.betrag, tx.beschreibung, tx.hinweis].map(esc).join(';') + '\n';
+        });
+        blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        filename = 'kontierung.csv';
+      } else if (choice === 'xml') {
+        const items = rows.map(tx =>
+          `<transaction><beguenstigter>${escapeXml(tx.beguenstigter)}</beguenstigter><buchungstext>${escapeXml(tx.buchungstext)}</buchungstext><verwendungszweck>${escapeXml(tx.verwendungszweck)}</verwendungszweck><datum>${escapeXml(tx.buchungstag)}</datum><betrag>${escapeXml(tx.betrag)}</betrag><beschreibung>${escapeXml(tx.beschreibung)}</beschreibung><hinweis>${escapeXml(tx.hinweis)}</hinweis></transaction>`
+        ).join('');
+        blob = new Blob([`<transactions>${items}</transactions>`], { type: 'application/xml;charset=utf-8;' });
+        filename = 'kontierung.xml';
+      } else if (choice === 'jpg') {
+        const tableHtml = getPrintableTableHtml();
+        const svgWidth = 1400;
+        const svgHeight = Math.max(900, 220 + rows.length * 40);
+        const svg = `
+          <svg xmlns="http://www.w3.org/2000/svg" width="${svgWidth}" height="${svgHeight}">
+            <foreignObject width="100%" height="100%">
+              <div xmlns="http://www.w3.org/1999/xhtml" style="font-family: 'Segoe UI', Arial, sans-serif; background: #ffffff; padding: 36px; color: #1f2937; box-sizing: border-box;">
+                <style>
+                  .table-wrap { border: 1px solid #cbd5e1; border-radius: 12px; overflow: hidden; }
+                  table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+                  th, td { border-bottom: 1px solid #cbd5e1; padding: 10px 9px; font-size: 13px; text-align: left; vertical-align: top; word-break: break-word; }
+                  th { background: #f1f5f9; color: #0f172a; font-weight: 700; }
+                  td { background: #ffffff; color: #1f2937; }
+                  tr:last-child td { border-bottom: none; }
+                  span { display: block; min-height: 16px; }
+                  .amount-positive { color: #16a34a; font-weight: 700; }
+                  .amount-negative { color: #dc2626; font-weight: 700; }
+                </style>
+                <div style="font-size: 24px; font-weight: 700; margin-bottom: 16px; color: #111827;">BISLEY Kontierung</div>
+                <div class="table-wrap">${tableHtml}</div>
+              </div>
+            </foreignObject>
+          </svg>`;
+
+        const blobSvg = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
+        const url = URL.createObjectURL(blobSvg);
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          canvas.width = svgWidth;
+          canvas.height = svgHeight;
+          const ctx = canvas.getContext('2d');
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(img, 0, 0);
+          URL.revokeObjectURL(url);
+
+          const link = document.createElement('a');
+          link.href = canvas.toDataURL('image/jpeg', 0.95);
+          link.download = 'kontierung.jpg';
+          link.click();
+          document.getElementById('exportModal').classList.add('hidden');
+          setStatus('JPG-Export erzeugt.', 'success');
+        };
+        img.onerror = () => {
+          URL.revokeObjectURL(url);
+          setStatus('Fehler: JPG-Export konnte nicht erstellt werden.', 'error');
+        };
+        img.src = url;
+        return;
+      }
+
+      if (blob && filename) {
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = filename;
+        link.click();
+        setStatus(`Export als ${choice.toUpperCase()} erzeugt.`, 'success');
+      }
+      document.getElementById('exportModal').classList.add('hidden');
+    });
+
+    printBtn.addEventListener('click', () => {
+      if (!currentTransactions.length) {
+        setStatus('Bitte zuerst eine CSV analysieren.', 'error');
+        return;
+      }
+      try {
+        openPrintView('BISLEY Kontierung – Druck', true);
+        setStatus('Druckdialog geöffnet.', 'success');
+      } catch (e) {
+        setStatus('Fehler: ' + e.message, 'error');
+      }
+    });
+
+    document.getElementById('cancelEditBtn').addEventListener('click', () => {
+      document.getElementById('editRuleModal').classList.add('hidden');
+    });
+
+    applySavedCorrections();
+  </script>
+</body>
+</html>

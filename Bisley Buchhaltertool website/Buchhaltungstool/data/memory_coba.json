@@ -1,0 +1,52 @@
+{
+  "entries": [],
+  "rules": [
+    {
+      "id": "723389ff-329d-445e-9cd6-962c3e44dc40",
+      "column": "buchungstext",
+      "condition": "equals",
+      "value": "COPILOT_TEST",
+      "result_hint": "9999/9",
+      "result_description": "temp test",
+      "active": false
+    },
+    {
+      "id": "97805808-fcc2-4602-a426-051520be6e3b",
+      "column": "beguenstigter",
+      "condition": "equals",
+      "value": "LEVITECH GmbH",
+      "second_column": "buchungstext",
+      "second_condition": "equals",
+      "second_value": "FOLGELASTSCHRIFT",
+      "result_hint": "70035",
+      "result_description": "70035",
+      "active": false
+    },
+    {
+      "id": "4248c151-e1db-4e59-baab-67d99e83779b",
+      "column": "buchungstext",
+      "condition": "equals",
+      "value": "SEPA-CT SAMMLER-SOLL",
+      "second_column": null,
+      "second_condition": null,
+      "second_value": null,
+      "result_hint": "s.anlage",
+      "result_description": "",
+      "active": true
+    }
+  ],
+  "corrections": {
+    "Kathan Ergonomie GmbH + Co. KG": {
+      "hinweis": "19798 ",
+      "beschreibung": ""
+    },
+    "OTTO Office GmbH Co KG Fabriciusst rasse 105a": {
+      "hinweis": "s.avis",
+      "beschreibung": ""
+    },
+    "LUMI LEGEND CORPORATION CN NINGBO 315100": {
+      "hinweis": "70617",
+      "beschreibung": ""
+    }
+  }
+}

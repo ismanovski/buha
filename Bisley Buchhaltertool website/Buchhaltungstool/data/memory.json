@@ -1,0 +1,217 @@
+{
+  "entries": [
+    {
+      "pdf_fingerprint": "30df36263db05234d194514fe9cd0b408337b3d9bcb62f3117f4fb8be7bd1cbc",
+      "company": "Umsätze - Druckansicht",
+      "kundennummer": "3001062559",
+      "kontierung": "?",
+      "hinweis": "#Error#"
+    }
+  ],
+  "rules": [
+    {
+      "id": "4a71fbf3-95a6-4fdb-9d12-d8a656eadefc",
+      "column": "buchungstext",
+      "condition": "equals",
+      "value": "SAMMEL-LS-EINZUG",
+      "result_hint": "s.anlage",
+      "active": true
+    },
+    {
+      "id": "18671319-ad08-441e-a92d-ab9431e6c771",
+      "column": "verwendungszweck",
+      "condition": "contains",
+      "value": "Rentenversicherung",
+      "result_hint": "1748/0",
+      "active": false
+    },
+    {
+      "id": "1a4e8f15-9dc3-4543-bc96-5496047c0f1f",
+      "column": "verwendungszweck",
+      "condition": "contains",
+      "value": "LEBENS-VERSICHERUNG",
+      "result_hint": "1748/0",
+      "active": false
+    },
+    {
+      "id": "c8cb9b8e-a63f-4d44-aa5f-6c8cfc7bc0b5",
+      "column": "verwendungszweck",
+      "condition": "contains",
+      "value": "121639695B00253",
+      "result_hint": "1745/0",
+      "result_description": "03/2026 LV Gabriel Ismanovski 121639695B00253",
+      "active": true
+    },
+    {
+      "id": "8ec57178-3196-4bc2-8b8b-9645d1eb541a",
+      "column": "verwendungszweck",
+      "condition": "contains",
+      "value": "121639695B00261",
+      "result_hint": "1745/0",
+      "result_description": "03/2026 LV Nicolai Jablonowski 121639695B00261",
+      "active": false
+    },
+    {
+      "id": "b8a98c0e-e233-4e06-ad6d-8ead6f890c59",
+      "column": "verwendungszweck",
+      "condition": "contains",
+      "value": "121639695B00014",
+      "result_hint": "1745/0",
+      "result_description": "03/2026 LV Frank Tombergs 121639695B00014",
+      "active": true
+    },
+    {
+      "id": "f620f47d-4d88-45a2-bb0e-1df7c221139c",
+      "column": "verwendungszweck",
+      "condition": "contains",
+      "value": "121639695B00261",
+      "result_hint": "1745/0",
+      "result_description": "03/2026 LV Nicolai Jablonowski 121639695B00261",
+      "active": true
+    },
+    {
+      "id": "214c624c-636d-4393-bc37-d8eeec321d36",
+      "column": "verwendungszweck",
+      "condition": "contains",
+      "value": "121639695B00139",
+      "result_hint": "1745/0",
+      "result_description": "04/2026 LV Julie Hüskens 121639695B00139",
+      "active": true
+    },
+    {
+      "id": "9347d689-f77c-452c-80dc-5c21bffbb23e",
+      "column": "beguenstigter",
+      "condition": "equals",
+      "value": "LEVITECH GmbH",
+      "second_column": "buchungstext",
+      "second_condition": "equals",
+      "second_value": "FOLGELASTSCHRIFT",
+      "result_hint": "70035",
+      "result_description": "70035",
+      "active": false
+    },
+    {
+      "id": "426373a7-27fe-47aa-960d-78028d282b1d",
+      "column": "beguenstigter",
+      "condition": "equals",
+      "value": "COPILOT_VENDOR_X",
+      "second_column": "buchungstext",
+      "second_condition": "equals",
+      "second_value": "COPILOT_SECOND_OK",
+      "result_hint": "TEST-AND",
+      "result_description": "TEST-AND",
+      "active": false
+    },
+    {
+      "id": "cb94dd8a-7d40-4d30-b87e-c4cc8f0b28bf",
+      "column": "beguenstigter",
+      "condition": "equals",
+      "value": "LEVITECH GmbH",
+      "second_column": "buchungstext",
+      "second_condition": "equals",
+      "second_value": "FOLGELASTSCHRIFT",
+      "result_hint": "70035",
+      "result_description": "",
+      "active": true
+    },
+    {
+      "id": "d94facdf-6794-47e8-ae52-66978b234ad5",
+      "column": "beguenstigter",
+      "condition": "equals",
+      "value": "LEVITECH GmbH",
+      "second_column": "buchungstext",
+      "second_condition": "equals",
+      "second_value": "GUTSCHR. UEBERWEISUNG",
+      "result_hint": "41747",
+      "result_description": "",
+      "active": true
+    }
+  ],
+  "corrections": {
+    "DE84300501101007636739": "",
+    "Bottcher AG": {
+      "hinweis": "s.avis",
+      "beschreibung": ""
+    },
+    "HANSEMERKUR VERS.": {
+      "hinweis": "1745/0",
+      "beschreibung": "04/2026 LV Frank Tombergs 121639695B00014"
+    },
+    "Jungheinrich PROFISHOP AG + Co. KG": {
+      "hinweis": "10862",
+      "beschreibung": ""
+    },
+    "Unite Procurement Deutschland AG                                      Rosenheimer Str. 116": {
+      "hinweis": "",
+      "beschreibung": ""
+    },
+    "Tischkoenig GmbH": {
+      "hinweis": "",
+      "beschreibung": ""
+    },
+    "PROFISHOP GmbH": {
+      "hinweis": "14554",
+      "beschreibung": ""
+    },
+    "Aktivbank AG Zentralregulierung": {
+      "hinweis": "s.avis",
+      "beschreibung": ""
+    },
+    "BUERO-PARTNER ULLRICH TAUTZ": {
+      "hinweis": "10797",
+      "beschreibung": ""
+    },
+    "ENRICO SILBER": {
+      "hinweis": "30823",
+      "beschreibung": ""
+    },
+    "PM.CONCEPT GMBH": {
+      "hinweis": "15401",
+      "beschreibung": ""
+    },
+    "TG GmbH Co. OHG                                                       Georg-Brauchle-Ring 23-25": {
+      "hinweis": "",
+      "beschreibung": ""
+    },
+    "GOTHAER LEBENSVERSICHERUNG": {
+      "hinweis": "",
+      "beschreibung": ""
+    },
+    "FEIERABEND GMBH": {
+      "hinweis": "12177",
+      "beschreibung": ""
+    },
+    "SOS-Kinderdorf e.V.": {
+      "hinweis": "12210",
+      "beschreibung": ""
+    },
+    "buroshop24 GmbH": {
+      "hinweis": "s.avis",
+      "beschreibung": ""
+    },
+    "office discount GmbH": {
+      "hinweis": "31755",
+      "beschreibung": ""
+    },
+    "Cramer Mobel + Design GmbH                                            Kieler Str. 301": {
+      "hinweis": "21696",
+      "beschreibung": ""
+    },
+    "Tekno GmbH": {
+      "hinweis": "90089",
+      "beschreibung": ""
+    },
+    "Printus GmbH                                                          Carl-Zeiss-Str. 1": {
+      "hinweis": "21336",
+      "beschreibung": ""
+    },
+    "UDO BAR GmbH": {
+      "hinweis": "11086",
+      "beschreibung": ""
+    },
+    "LEVITECH GmbH": {
+      "hinweis": "70035",
+      "beschreibung": ""
+    }
+  }
+}
