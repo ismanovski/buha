@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BISLEY – RE Buchung verwalten</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: 'FS Eliott', Arial, sans-serif;
+      background: #f3f4f6;
+      color: #111827;
+    }
+
+    header {
+      background: #232324;
+      color: #fff;
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+      padding: 12px 18px;
+    }
+
+    .header-left { justify-self: start; }
+    .header-center { justify-self: center; }
+    .header-center img { width: 200px; display: block; }
+    .header-right {
+      justify-self: end;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .spk-logo { height: 45px; display: block; }
+    .datetime { font-size: 13px; opacity: 0.85; white-space: nowrap; }
+    .clock {
+      width: 54px;
+      height: 54px;
+      position: relative;
+      border-radius: 50%;
+      background: radial-gradient(circle at 30% 30%, #3a3a3d, #1f1f22 65%, #141416 100%);
+      border: 2px solid rgba(255,255,255,0.18);
+    }
+    .clock-center {
+      position: absolute;
+      width: 8px;
+      height: 8px;
+      background: #fff;
+      border-radius: 50%;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 5;
+      box-shadow: 0 0 0 2px #1f1f22;
+    }
+    .hand {
+      position: absolute;
+      left: 50%;
+      bottom: 50%;
+      transform-origin: bottom center;
+      border-radius: 999px;
+      transform: translateX(-50%) rotate(0deg);
+    }
+    .hour { width: 4px; height: 14px; background: #fff; }
+    .minute { width: 3px; height: 20px; background: #d1d5db; }
+    .second { width: 2px; height: 22px; background: #ff3b3b; }
+
+    main {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 34px 20px 60px;
+    }
+
+    .toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+    }
+
+    .toolbar h1 {
+      margin: 0;
+      font-size: 2rem;
+    }
+
+    .toolbar p {
+      margin: 8px 0 0;
+      color: #4b5563;
+    }
+
+    .btn {
+      background: #232324;
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      padding: 10px 16px;
+      font-size: 14px;
+      font-weight: 700;
+      text-decoration: none;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn.secondary {
+      background: #e5e7eb;
+      color: #111827;
+    }
+
+    .grid {
+      display: grid;
+      gap: 16px;
+    }
+
+    .filters {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(160px, 1fr));
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    .filters input {
+      width: 100%;
+      border: 1px solid #d1d5db;
+      border-radius: 10px;
+      padding: 10px;
+      font-size: 14px;
+      background: #fff;
+      color: #111827;
+    }
+
+    @media (max-width: 860px) {
+      .filters {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card {
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 20px;
+      padding: 20px;
+      box-shadow: 0 12px 30px rgba(15, 23, 42, 0.06);
+    }
+
+    .project-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .project-row h2 {
+      margin: 0 0 6px;
+      font-size: 1.15rem;
+    }
+
+    .muted {
+      color: #6b7280;
+      font-size: 14px;
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-left">
+      <a href="https://www.sskduesseldorf.de/fi/home/onlinebanking/finanzuebersicht.html" target="_blank" rel="noopener">
+        <img src="/static/SPK Logo.png" alt="Sparkasse" class="spk-logo">
+      </a>
+    </div>
+    <div class="header-center">
+      <a href="/" aria-label="Zur Startseite">
+        <img src="/static/BISLEY_LOGO.png" alt="Bisley Logo">
+      </a>
+    </div>
+    <div class="header-right">
+      <div class="datetime" id="dateTime"></div>
+      <div class="clock">
+        <div class="clock-center"></div>
+        <div class="hand hour" id="hourHand"></div>
+        <div class="hand minute" id="minuteHand"></div>
+        <div class="hand second" id="secondHand"></div>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <div class="toolbar">
+      <div>
+        <h1>Buchung verwalten</h1>
+        <p>Hier erscheinen lokal gespeicherte RE-Buchungen aus diesem Browser.</p>
+      </div>
+      <div class="actions">
+        <a class="btn secondary" href="/re-buchung">← Zurück</a>
+        <a class="btn" href="/re-buchung/neu">Neue Buchung</a>
+      </div>
+    </div>
+
+    <section class="filters">
+      <input id="filterName" type="text" placeholder="Rechnungsname suchen" />
+      <input id="filterKreditor" type="text" placeholder="Kreditor suchen" />
+      <input id="filterFrom" type="date" title="Gebucht am von" />
+      <input id="filterTo" type="date" title="Gebucht am bis" />
+    </section>
+
+    <section class="grid" id="projectList">
+      <div class="card">
+        <div class="muted">Gespeicherte Vorgänge werden geladen…</div>
+      </div>
+    </section>
+  </main>
+
+  <script src="/static/re_buchung_store.js"></script>
+  <script>
+    function updateDateTime() {
+      const now = new Date();
+      const date = now.toLocaleDateString('de-DE', {
+        weekday: 'short',
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+      });
+      document.getElementById('dateTime').textContent = date;
+
+      const seconds = now.getSeconds();
+      const minutes = now.getMinutes();
+      const hours = now.getHours();
+      document.getElementById('secondHand').style.transform = `translateX(-50%) rotate(${seconds * 6}deg)`;
+      document.getElementById('minuteHand').style.transform = `translateX(-50%) rotate(${minutes * 6 + seconds * 0.1}deg)`;
+      document.getElementById('hourHand').style.transform = `translateX(-50%) rotate(${(hours % 12) * 30 + minutes * 0.5}deg)`;
+    }
+
+    function formatDate(value) {
+      if (!value) return 'Unbekannt';
+      return new Date(value).toLocaleString('de-DE');
+    }
+
+    function getProjectKreditor(project) {
+      const firstKontierung = (project.stamps || []).find((stamp) => stamp.type === 'kontierung');
+      return String(firstKontierung?.fields?.kreditor || '').trim();
+    }
+
+    function toStartOfDay(value) {
+      if (!value) return null;
+      const date = new Date(value);
+      date.setHours(0, 0, 0, 0);
+      return date;
+    }
+
+    function toEndOfDay(value) {
+      if (!value) return null;
+      const date = new Date(value);
+      date.setHours(23, 59, 59, 999);
+      return date;
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    let allProjects = [];
+
+    function getFilteredProjects() {
+      const nameQuery = String(document.getElementById('filterName').value || '').trim().toLowerCase();
+      const kreditorQuery = String(document.getElementById('filterKreditor').value || '').trim().toLowerCase();
+      const fromDate = toStartOfDay(document.getElementById('filterFrom').value);
+      const toDate = toEndOfDay(document.getElementById('filterTo').value);
+
+      return allProjects.filter((project) => {
+        const name = String(project.name || '').toLowerCase();
+        const kreditor = String(getProjectKreditor(project) || '').toLowerCase();
+        const bookedAt = new Date(project.updatedAt || project.createdAt || 0);
+
+        if (nameQuery && !name.includes(nameQuery)) {
+          return false;
+        }
+        if (kreditorQuery && !kreditor.includes(kreditorQuery)) {
+          return false;
+        }
+        if (fromDate && bookedAt < fromDate) {
+          return false;
+        }
+        if (toDate && bookedAt > toDate) {
+          return false;
+        }
+        return true;
+      });
+    }
+
+    async function renderProjects() {
+      const container = document.getElementById('projectList');
+      const projects = getFilteredProjects();
+
+      if (!projects.length) {
+        container.innerHTML = `
+          <div class="card">
+            <div class="muted">Keine passenden Buchungen gefunden.</div>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = projects.map((project) => `
+        <article class="card">
+          <div class="project-row">
+            <div>
+              <h2>${escapeHtml(project.name || 'Unbenannte Buchung')}</h2>
+              <div class="muted">Kreditor: ${escapeHtml(getProjectKreditor(project) || '-')}</div>
+              <div class="muted">Zuletzt gespeichert: ${formatDate(project.updatedAt)}</div>
+              <div class="muted">${project.stamps?.length || 0} Stempel gespeichert</div>
+            </div>
+            <div class="actions">
+              <a class="btn" href="/re-buchung/neu?project=${encodeURIComponent(project.id)}&mode=manage">Öffnen</a>
+              <button class="btn secondary" data-delete-id="${project.id}">Löschen</button>
+            </div>
+          </div>
+        </article>
+      `).join('');
+
+      document.querySelectorAll('[data-delete-id]').forEach((button) => {
+        button.addEventListener('click', async () => {
+          const { deleteId } = button.dataset;
+          if (!confirm('Sind Sie sich sicher, dass Sie diese Buchung löschen möchten?')) {
+            return;
+          }
+          await deleteReProject(deleteId);
+          allProjects = await listReProjects();
+          renderProjects();
+        });
+      });
+    }
+
+    function bindFilterEvents() {
+      const filterIds = ['filterName', 'filterKreditor', 'filterFrom', 'filterTo'];
+      filterIds.forEach((id) => {
+        const element = document.getElementById(id);
+        if (!element) return;
+        element.addEventListener('input', renderProjects);
+        element.addEventListener('change', renderProjects);
+      });
+    }
+
+    updateDateTime();
+    setInterval(updateDateTime, 1000);
+    bindFilterEvents();
+
+    async function init() {
+      allProjects = await listReProjects();
+      renderProjects();
+    }
+
+    init();
+  </script>
+</body>
+</html>

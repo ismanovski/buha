@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BISLEY – Handbuch Buchhaltung</title>
+  <link href="https://cdn.quilljs.com/1.3.7/quill.snow.css" rel="stylesheet" />
+  <style>
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: 'FS Eliott', Arial, sans-serif;
+      background: #f3f4f6;
+      color: #000;
+    }
+
+    /* ── HEADER ── */
+    header {
+      background: #232324;
+      color: #fff;
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+      padding: 12px 18px;
+    }
+    .header-left  { justify-self: start; }
+    .header-center { justify-self: center; }
+    .header-center img { width: 200px; display: block; }
+    .header-right {
+      justify-self: end;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .spk-logo { height: 45px; display: block; }
+    .spk-logo:hover { transform: scale(1.04); transition: 0.2s ease; }
+    .datetime { font-size: 13px; opacity: 0.85; white-space: nowrap; }
+
+    /* ── ANALOG CLOCK ── */
+    .clock {
+      width: 54px;
+      height: 54px;
+      position: relative;
+      border-radius: 50%;
+      background: radial-gradient(circle at 30% 30%, #3a3a3d, #1f1f22 65%, #141416 100%);
+      border: 2px solid rgba(255,255,255,0.18);
+      box-shadow: inset 0 2px 6px rgba(255,255,255,0.08), inset 0 -4px 8px rgba(0,0,0,0.35), 0 4px 12px rgba(0,0,0,0.25);
+    }
+    .clock-center {
+      position: absolute;
+      width: 8px; height: 8px;
+      background: #fff;
+      border-radius: 50%;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 5;
+      box-shadow: 0 0 0 2px #1f1f22;
+    }
+    .hand {
+      position: absolute;
+      left: 50%; bottom: 50%;
+      transform-origin: bottom center;
+      border-radius: 999px;
+      transform: translateX(-50%) rotate(0deg);
+    }
+    .hour   { width: 4px; height: 14px; background: #fff; }
+    .minute { width: 3px; height: 20px; background: #d1d5db; }
+    .second { width: 2px; height: 22px; background: #ff3b3b; }
+
+    /* ── EDITOR PAGE ── */
+    .editor-page {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    .toc-fixed {
+      position: fixed;
+      left: 20px;
+      top: calc(120px + 2cm);
+      z-index: 1100;
+      width: 260px;
+      max-height: calc(100vh - 140px);
+      overflow: auto;
+      background: rgba(255, 255, 255, 0.96);
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.12);
+      padding: 12px;
+      backdrop-filter: blur(6px);
+    }
+
+    .toc-fixed h3 {
+      margin: 0 0 10px;
+      font-size: 15px;
+      color: #111827;
+    }
+
+    .toc-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .toc-link {
+      display: block;
+      width: 100%;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 6px 10px;
+      background: #f9fafb;
+      color: #111827;
+      text-decoration: none;
+      font-size: 13px;
+      cursor: pointer;
+      text-align: left;
+    }
+
+    .toc-link:hover {
+      background: #eef2ff;
+      border-color: #c7d2fe;
+    }
+
+    .toc-empty {
+      font-size: 13px;
+      color: #6b7280;
+    }
+
+    .editor-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .editor-header h2 {
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: #111827;
+      margin: 0;
+    }
+
+    .editor-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .editor-tools-fixed {
+      position: fixed;
+      right: 20px;
+      top: calc(100px + 8cm);
+      z-index: 1200;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      width: 250px;
+      background: rgba(255, 255, 255, 0.96);
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.12);
+      padding: 10px;
+      backdrop-filter: blur(6px);
+    }
+
+    .editor-tools-fixed .btn {
+      width: 100%;
+      justify-content: center;
+    }
+
+    .editor-tools-fixed .save-status {
+      text-align: center;
+    }
+
+    .search-box {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding: 8px;
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      background: #f9fafb;
+    }
+
+    .search-box input {
+      width: 100%;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-size: 13px;
+    }
+
+    .search-row {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .search-row .btn {
+      flex: 1;
+      padding: 7px 10px;
+      font-size: 12px;
+    }
+
+    .search-info {
+      font-size: 12px;
+      color: #4b5563;
+      text-align: right;
+    }
+
+    /* ── BUTTONS ── */
+    .btn {
+      background: #232324;
+      color: #fff;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: background 0.2s;
+      text-decoration: none;
+    }
+    .btn:hover  { background: #3a3a3c; }
+    .btn.active { background: #1d4ed8; }
+    .btn.green  { background: #059669; }
+    .btn.green:hover { background: #047857; }
+    .btn.red    { background: #dc2626; }
+    .btn.red:hover   { background: #b91c1c; }
+
+    /* ── SAVE STATUS ── */
+    .save-status {
+      font-size: 13px;
+      padding: 5px 11px;
+      border-radius: 6px;
+      font-weight: 500;
+    }
+    .save-status.saved   { color: #059669; background: #d1fae5; }
+    .save-status.saving  { color: #d97706; background: #fef3c7; }
+    .save-status.unsaved { color: #dc2626; background: #fee2e2; }
+
+    /* ── EXPORT DROPDOWN ── */
+    .export-container { position: relative; }
+    .export-menu {
+      position: absolute;
+      top: calc(100% + 4px);
+      right: 0;
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+      z-index: 1000;
+      min-width: 170px;
+      overflow: hidden;
+    }
+    .export-menu button {
+      width: 100%;
+      background: none;
+      border: none;
+      padding: 10px 16px;
+      text-align: left;
+      cursor: pointer;
+      font-size: 14px;
+      color: #111827;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .export-menu button:hover { background: #f3f4f6; }
+
+    /* ── EDITOR WRAPPER ── */
+    .editor-wrapper {
+      background: #fff;
+      border-radius: 12px;
+      border: 1px solid #e5e7eb;
+      overflow: hidden;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+
+    #toolbar {
+      border-radius: 0;
+      background: #f9fafb;
+      border-bottom: 1px solid #e5e7eb !important;
+    }
+
+    .editor-container {
+      position: relative;
+    }
+
+    #editor {
+      font-size: 15px;
+      line-height: 1.7;
+    }
+
+    .ql-container.ql-snow { border: none; }
+    .ql-toolbar.ql-snow   { border: none; }
+
+    .ql-editor {
+      min-height: 65vh;
+      padding: 32px 44px;
+      font-size: 15px;
+    }
+
+    /* ── STATUS BAR ── */
+    .status-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 6px 16px;
+      background: #f9fafb;
+      border-top: 1px solid #e5e7eb;
+      font-size: 12px;
+      color: #6b7280;
+    }
+
+    @media (max-width: 1200px) {
+      .toc-fixed {
+        position: static;
+        width: 100%;
+        max-height: none;
+        margin-bottom: 12px;
+      }
+
+      .editor-tools-fixed {
+        position: static;
+        width: 100%;
+        margin-bottom: 12px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ══════════ HEADER ══════════ -->
+<header>
+  <div class="header-left">
+    <a href="https://www.sskduesseldorf.de/fi/home/onlinebanking/finanzuebersicht.html" target="_blank" rel="noopener">
+      <img src="/static/SPK Logo.png" alt="Sparkasse" class="spk-logo">
+    </a>
+  </div>
+  <div class="header-center">
+    <a href="/" aria-label="Zur Startseite">
+      <img src="/static/BISLEY_LOGO.png" alt="Bisley Logo">
+    </a>
+  </div>
+  <div class="header-right">
+    <div class="datetime" id="dateTime"></div>
+    <div class="clock">
+      <div class="clock-center"></div>
+      <div class="hand hour"   id="hourHand"></div>
+      <div class="hand minute" id="minuteHand"></div>
+      <div class="hand second" id="secondHand"></div>
+    </div>
+  </div>
+</header>
+
+<!-- ══════════ EDITOR PAGE ══════════ -->
+<div class="editor-page">
+
+  <aside class="toc-fixed">
+    <h3>Inhaltsverzeichnis</h3>
+    <ul class="toc-list" id="tocList">
+      <li class="toc-empty">Wird aus den Überschriften erzeugt…</li>
+    </ul>
+  </aside>
+
+  <!-- Top bar -->
+  <div class="editor-header">
+    <div style="display:flex;align-items:center;gap:14px;">
+      <a href="/" class="btn">← Zurück</a>
+      <h2>📖 Handbuch Buchhaltung</h2>
+    </div>
+    <div class="editor-actions"></div>
+  </div>
+
+  <div class="editor-tools-fixed">
+    <div class="search-box">
+      <input id="searchInput" type="text" placeholder="Im Handbuch suchen..." />
+      <div class="search-row">
+        <button class="btn" id="searchRunBtn" onclick="runSearchAndJump()">Suchen</button>
+        <button class="btn" id="searchPrevBtn" onclick="jumpToPreviousMatch()">Zurueck</button>
+        <button class="btn" id="searchNextBtn" onclick="jumpToNextMatch()">Weiter</button>
+      </div>
+      <div class="search-info" id="searchInfo">0 Treffer</div>
+    </div>
+
+    <button class="btn" id="toggleEditBtn" onclick="toggleEditMode()">Bearbeiten</button>
+    <button class="btn" onclick="printHandbuch()">🖨️ Drucken</button>
+
+    <div class="save-status saved" id="saveStatus">Lesemodus</div>
+    <button class="btn green" id="saveBtn" onclick="saveContent()" disabled>💾 Speichern</button>
+
+    <div class="export-container">
+      <button class="btn" onclick="toggleExportMenu()">📥 Exportieren ▾</button>
+      <div class="export-menu" id="exportMenu" style="display:none">
+        <button onclick="exportDocx()">📄 Als Word (.docx)</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Editor wrapper -->
+  <div class="editor-wrapper">
+
+    <!-- Quill toolbar -->
+    <div id="toolbar">
+      <span class="ql-formats">
+        <select class="ql-header">
+          <option value="1">Überschrift 1</option>
+          <option value="2">Überschrift 2</option>
+          <option value="3">Überschrift 3</option>
+          <option selected>Normal</option>
+        </select>
+      </span>
+      <span class="ql-formats">
+        <button class="ql-bold"></button>
+        <button class="ql-italic"></button>
+        <button class="ql-underline"></button>
+        <button class="ql-strike"></button>
+      </span>
+      <span class="ql-formats">
+        <select class="ql-color"></select>
+        <select class="ql-background"></select>
+      </span>
+      <span class="ql-formats">
+        <button class="ql-list" value="ordered"></button>
+        <button class="ql-list" value="bullet"></button>
+        <button class="ql-indent" value="-1"></button>
+        <button class="ql-indent" value="+1"></button>
+      </span>
+      <span class="ql-formats">
+        <select class="ql-align"></select>
+      </span>
+      <span class="ql-formats">
+        <button class="ql-link"></button>
+        <button class="ql-image"></button>
+        <button class="ql-blockquote"></button>
+      </span>
+      <span class="ql-formats">
+        <button class="ql-clean"></button>
+      </span>
+    </div>
+
+    <!-- Editor + canvas overlay -->
+    <div class="editor-container" id="editorContainer">
+      <div id="editor"></div>
+    </div>
+
+    <!-- Status bar -->
+    <div class="status-bar">
+      <span id="wordCount">Wörter: 0</span>
+      <span id="charCount">Zeichen: 0</span>
+      <span id="lastSaved">Noch nicht gespeichert</span>
+    </div>
+  </div>
+
+</div>
+
+<!-- ══════════ SCRIPTS ══════════ -->
+<script src="https://cdn.quilljs.com/1.3.7/quill.js"></script>
+<script src="https://unpkg.com/html-docx-js/dist/html-docx.js"></script>
+<script>
+// ═══════════════════════════════════════════
+//  QUILL SETUP
+// ═══════════════════════════════════════════
+const quill = new Quill('#editor', {
+  theme: 'snow',
+  modules: { toolbar: '#toolbar' },
+  placeholder: 'Handbuch hier bearbeiten…'
+});
+
+// ═══════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════
+let isDrawMode = false;
+let isEditMode = false;
+let dirty = false;
+let searchMatches = [];
+let currentMatchIndex = -1;
+
+function normalizeSearchText(text) {
+  return String(text || '').toLowerCase();
+}
+
+function updateSearchMatches() {
+  const query = normalizeSearchText(document.getElementById('searchInput').value).trim();
+  const source = normalizeSearchText(quill.getText());
+  searchMatches = [];
+  currentMatchIndex = -1;
+
+  if (!query) {
+    document.getElementById('searchInfo').textContent = '0 Treffer';
+    return;
+  }
+
+  let start = 0;
+  while (start < source.length) {
+    const index = source.indexOf(query, start);
+    if (index === -1) break;
+    searchMatches.push(index);
+    start = index + Math.max(1, query.length);
+  }
+
+  document.getElementById('searchInfo').textContent = `${searchMatches.length} Treffer`;
+}
+
+function focusMatch(matchIndex, query) {
+  if (!searchMatches.length) return;
+  currentMatchIndex = ((matchIndex % searchMatches.length) + searchMatches.length) % searchMatches.length;
+  const index = searchMatches[currentMatchIndex];
+  quill.setSelection(index, query.length, 'silent');
+
+  // Use several fallbacks so jumping works in both read and edit mode.
+  requestAnimationFrame(() => {
+    const scroller = quill.scrollingContainer || quill.root;
+
+    if (typeof quill.scrollSelectionIntoView === 'function') {
+      quill.scrollSelectionIntoView();
+    }
+
+    const [leaf] = quill.getLeaf(index);
+    const domNode = leaf && leaf.domNode ? leaf.domNode : null;
+    const targetNode = domNode
+      ? (domNode.nodeType === Node.TEXT_NODE ? domNode.parentElement : domNode)
+      : null;
+
+    if (targetNode && typeof targetNode.scrollIntoView === 'function') {
+      targetNode.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+    }
+
+    const bounds = quill.getBounds(index, query.length);
+    if (scroller && Number.isFinite(bounds.top)) {
+      const targetTop = Math.max(0, bounds.top - scroller.clientHeight / 3);
+      if (typeof scroller.scrollTo === 'function') {
+        scroller.scrollTo({ top: targetTop, behavior: 'smooth' });
+      } else {
+        scroller.scrollTop = targetTop;
+      }
+    }
+  });
+
+  document.getElementById('searchInfo').textContent = `${currentMatchIndex + 1}/${searchMatches.length} Treffer`;
+}
+
+function runSearchAndJump() {
+  const query = String(document.getElementById('searchInput').value || '').trim();
+  updateSearchMatches();
+  if (!query || !searchMatches.length) return;
+  focusMatch(0, query);
+}
+
+function jumpToNextMatch() {
+  const query = String(document.getElementById('searchInput').value || '').trim();
+  if (!query) {
+    updateSearchMatches();
+    return;
+  }
+  if (!searchMatches.length) {
+    updateSearchMatches();
+    if (!searchMatches.length) return;
+  }
+
+  focusMatch(currentMatchIndex + 1, query);
+}
+
+function jumpToPreviousMatch() {
+  const query = String(document.getElementById('searchInput').value || '').trim();
+  if (!query) {
+    updateSearchMatches();
+    return;
+  }
+  if (!searchMatches.length) {
+    updateSearchMatches();
+    if (!searchMatches.length) return;
+  }
+
+  const base = currentMatchIndex < 0 ? 0 : currentMatchIndex;
+  focusMatch(base - 1, query);
+}
+
+function toggleEditMode() {
+  isEditMode = !isEditMode;
+  const editBtn = document.getElementById('toggleEditBtn');
+  const saveBtn = document.getElementById('saveBtn');
+
+  quill.enable(isEditMode);
+  saveBtn.disabled = !isEditMode;
+
+  if (isEditMode) {
+    editBtn.classList.add('active');
+    editBtn.textContent = 'Bearbeitung beenden';
+    setStatus(dirty ? 'unsaved' : 'saved', dirty ? 'Nicht gespeichert' : 'Gespeichert ✓');
+  } else {
+    editBtn.classList.remove('active');
+    editBtn.textContent = 'Bearbeiten';
+    setStatus('saved', 'Lesemodus');
+  }
+}
+
+// ═══════════════════════════════════════════
+//  SAVE
+// ═══════════════════════════════════════════
+async function saveContent() {
+  if (!isEditMode) return;
+  setStatus('saving', '💾 Wird gespeichert…');
+  try {
+    const payload = {
+      delta:       JSON.stringify(quill.getContents()),
+      html:        quill.root.innerHTML
+    };
+    const res = await fetch('/handbuch/save', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(payload)
+    });
+    if (res.ok) {
+      dirty = false;
+      const now = new Date().toLocaleTimeString('de-DE');
+      document.getElementById('lastSaved').textContent = `Zuletzt gespeichert: ${now}`;
+      setStatus('saved', 'Gespeichert ✓');
+    } else {
+      setStatus('unsaved', 'Fehler ✗');
+    }
+  } catch {
+    setStatus('unsaved', 'Fehler ✗');
+  }
+}
+
+function setStatus(type, text) {
+  const el = document.getElementById('saveStatus');
+  el.className = 'save-status ' + type;
+  el.textContent = text;
+}
+
+function printHandbuch() {
+  window.print();
+}
+
+function updateToc() {
+  const list = document.getElementById('tocList');
+  const headings = quill.root.querySelectorAll('h1, h2, h3');
+  if (!headings.length) {
+    list.innerHTML = '<li class="toc-empty">Keine Überschriften gefunden.</li>';
+    return;
+  }
+
+  list.innerHTML = '';
+  headings.forEach((heading, index) => {
+    const headingId = `heading-${index + 1}`;
+    heading.id = headingId;
+
+    const li = document.createElement('li');
+    const link = document.createElement('a');
+    link.href = '#';
+    link.className = 'toc-link';
+    link.textContent = heading.textContent.trim() || `Abschnitt ${index + 1}`;
+    link.addEventListener('click', (event) => {
+      event.preventDefault();
+      heading.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+
+    if (heading.tagName === 'H2') {
+      link.style.paddingLeft = '16px';
+    }
+    if (heading.tagName === 'H3') {
+      link.style.paddingLeft = '24px';
+    }
+
+    li.appendChild(link);
+    list.appendChild(li);
+  });
+}
+
+// Auto-save every 30 s if dirty
+setInterval(() => { if (dirty) saveContent(); }, 30000);
+
+quill.on('text-change', () => {
+  if (!isEditMode) return;
+  dirty = true;
+  setStatus('unsaved', 'Nicht gespeichert');
+  updateCounts();
+  updateToc();
+  updateSearchMatches();
+});
+
+// ═══════════════════════════════════════════
+//  LOAD
+// ═══════════════════════════════════════════
+async function loadContent() {
+  try {
+    const res = await fetch('/handbuch/content');
+    if (!res.ok) return;
+    const data = await res.json();
+
+    if (data.delta) {
+      try {
+        quill.setContents(JSON.parse(data.delta), 'silent');
+      } catch {
+        if (data.html) quill.clipboard.dangerouslyPasteHTML(data.html);
+      }
+    } else if (data.html) {
+      quill.clipboard.dangerouslyPasteHTML(data.html);
+    }
+
+    dirty = false;
+    setStatus('saved', 'Gespeichert ✓');
+    updateCounts();
+    updateToc();
+    updateSearchMatches();
+  } catch (err) {
+    console.error('Laden fehlgeschlagen:', err);
+  }
+}
+
+// ═══════════════════════════════════════════
+//  EXPORT
+// ═══════════════════════════════════════════
+function toggleExportMenu() {
+  const menu = document.getElementById('exportMenu');
+  menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+}
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('.export-container')) {
+    document.getElementById('exportMenu').style.display = 'none';
+  }
+});
+
+function exportDocx() {
+  document.getElementById('exportMenu').style.display = 'none';
+
+  const editorHtml = quill.root.innerHTML;
+  const fullHtml = `<!DOCTYPE html><html><head><meta charset="UTF-8">
+    <style>
+      body { font-family: Arial, sans-serif; font-size: 12pt; margin: 2cm; }
+      h1 { font-size: 18pt; } h2 { font-size: 15pt; } h3 { font-size: 13pt; }
+      ul, ol { margin-left: 1.2em; }
+    </style></head><body>
+    <h1>Handbuch Buchhaltung</h1>
+    ${editorHtml}
+  </body></html>`;
+
+  try {
+    const blob = htmlDocx.asBlob(fullHtml);
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = 'Handbuch_Buchhaltung.docx';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    alert('Export fehlgeschlagen: ' + err.message);
+  }
+}
+
+// ═══════════════════════════════════════════
+//  WORD / CHAR COUNT
+// ═══════════════════════════════════════════
+function updateCounts() {
+  const text  = quill.getText().trim();
+  const words = text ? text.split(/\s+/).filter(w => w).length : 0;
+  document.getElementById('wordCount').textContent = `Wörter: ${words}`;
+  document.getElementById('charCount').textContent = `Zeichen: ${text.length}`;
+}
+
+// ═══════════════════════════════════════════
+//  CLOCK
+// ═══════════════════════════════════════════
+function updateDateTime() {
+  const now  = new Date();
+  const date = now.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' });
+  const el   = document.getElementById('dateTime');
+  if (el) el.textContent = date;
+
+  const s = now.getSeconds(), m = now.getMinutes(), h = now.getHours();
+  document.getElementById('secondHand').style.transform = `translateX(-50%) rotate(${s * 6}deg)`;
+  document.getElementById('minuteHand').style.transform = `translateX(-50%) rotate(${m * 6 + s * 0.1}deg)`;
+  document.getElementById('hourHand').style.transform   = `translateX(-50%) rotate(${(h % 12) * 30 + m * 0.5}deg)`;
+}
+updateDateTime();
+setInterval(updateDateTime, 1000);
+
+// ═══════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════
+window.addEventListener('load', () => {
+  quill.enable(false);
+  const searchInput = document.getElementById('searchInput');
+  searchInput.addEventListener('input', updateSearchMatches);
+  searchInput.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      if (event.shiftKey) {
+        jumpToPreviousMatch();
+      } else {
+        runSearchAndJump();
+      }
+    }
+  });
+  setTimeout(() => { loadContent(); }, 200);
+});
+</script>
+</body>
+</html>

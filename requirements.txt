@@ -1,0 +1,9 @@
+fastapi
+uvicorn[standard]
+pydantic
+pillow
+pymupdf
+pytesseract
+reportlab
+python-multipart
+mammoth

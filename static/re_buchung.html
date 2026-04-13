@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BISLEY – RE Buchung</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: 'FS Eliott', Arial, sans-serif;
+      background: #f3f4f6;
+      color: #111827;
+    }
+
+    header {
+      background: #232324;
+      color: #fff;
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+      padding: 12px 18px;
+    }
+
+    .header-left { justify-self: start; }
+    .header-center { justify-self: center; }
+    .header-center img { width: 200px; display: block; }
+    .header-right {
+      justify-self: end;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .spk-logo { height: 45px; display: block; }
+    .datetime { font-size: 13px; opacity: 0.85; white-space: nowrap; }
+    .clock {
+      width: 54px;
+      height: 54px;
+      position: relative;
+      border-radius: 50%;
+      background: radial-gradient(circle at 30% 30%, #3a3a3d, #1f1f22 65%, #141416 100%);
+      border: 2px solid rgba(255,255,255,0.18);
+    }
+    .clock-center {
+      position: absolute;
+      width: 8px;
+      height: 8px;
+      background: #fff;
+      border-radius: 50%;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 5;
+      box-shadow: 0 0 0 2px #1f1f22;
+    }
+    .hand {
+      position: absolute;
+      left: 50%;
+      bottom: 50%;
+      transform-origin: bottom center;
+      border-radius: 999px;
+      transform: translateX(-50%) rotate(0deg);
+    }
+    .hour { width: 4px; height: 14px; background: #fff; }
+    .minute { width: 3px; height: 20px; background: #d1d5db; }
+    .second { width: 2px; height: 22px; background: #ff3b3b; }
+
+    main {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 36px 20px 60px;
+    }
+
+    .hero {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: 16px;
+      margin-bottom: 28px;
+    }
+
+    .hero h1 {
+      margin: 0 0 8px;
+      font-size: 2rem;
+    }
+
+    .hero p {
+      margin: 0;
+      color: #4b5563;
+      font-size: 1rem;
+      max-width: 620px;
+    }
+
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      text-decoration: none;
+      color: #1d4ed8;
+      font-weight: 700;
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(280px, 1fr));
+      gap: 24px;
+    }
+
+    .tile {
+      text-decoration: none;
+      color: inherit;
+      background: linear-gradient(160deg, #ffffff, #eef2f7);
+      border: 1px solid #dbe3ee;
+      border-radius: 26px;
+      padding: 28px;
+      min-height: 240px;
+      box-shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .tile:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 24px 48px rgba(15, 23, 42, 0.12);
+    }
+
+    .tile-badge {
+      align-self: flex-start;
+      background: #dbeafe;
+      color: #1d4ed8;
+      padding: 7px 12px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .tile h2 {
+      margin: 0;
+      font-size: 1.8rem;
+    }
+
+    .tile p {
+      margin: 10px 0 0;
+      color: #4b5563;
+      line-height: 1.5;
+    }
+
+    .tile-footer {
+      margin-top: 18px;
+      font-weight: 700;
+      color: #111827;
+    }
+
+    @media (max-width: 800px) {
+      .cards {
+        grid-template-columns: 1fr;
+      }
+
+      .hero {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-left">
+      <a href="https://www.sskduesseldorf.de/fi/home/onlinebanking/finanzuebersicht.html" target="_blank" rel="noopener">
+        <img src="/static/SPK Logo.png" alt="Sparkasse" class="spk-logo">
+      </a>
+    </div>
+    <div class="header-center">
+      <a href="/" aria-label="Zur Startseite">
+        <img src="/static/BISLEY_LOGO.png" alt="Bisley Logo">
+      </a>
+    </div>
+    <div class="header-right">
+      <div class="datetime" id="dateTime"></div>
+      <div class="clock">
+        <div class="clock-center"></div>
+        <div class="hand hour" id="hourHand"></div>
+        <div class="hand minute" id="minuteHand"></div>
+        <div class="hand second" id="secondHand"></div>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <a class="back-link" href="/">← Startseite</a>
+    <div class="hero">
+      <div>
+        <h1>RE Buchung</h1>
+        <p>Rechnungen als PDF hochladen, mit Kontierungs- und Buchungsstempel versehen und lokale Arbeitsstände später wieder öffnen.</p>
+      </div>
+    </div>
+
+    <section class="cards">
+      <a class="tile" href="/re-buchung/neu">
+        <span class="tile-badge">Arbeitsplatz</span>
+        <div>
+          <h2>Neue Buchung</h2>
+          <p>PDF per Datei-Upload oder Drag & Drop öffnen und direkt stempeln, beschriften und lokal speichern.</p>
+        </div>
+        <div class="tile-footer">Zum PDF-Arbeitsbereich →</div>
+      </a>
+
+      <a class="tile" href="/re-buchung/verwalten">
+        <span class="tile-badge">Übersicht</span>
+        <div>
+          <h2>Buchung verwalten</h2>
+          <p>Gespeicherte RE-Buchungen im Browser wiederfinden, öffnen oder bei Bedarf entfernen.</p>
+        </div>
+        <div class="tile-footer">Gespeicherte Vorgänge öffnen →</div>
+      </a>
+    </section>
+  </main>
+
+  <script>
+    function updateDateTime() {
+      const now = new Date();
+      const date = now.toLocaleDateString('de-DE', {
+        weekday: 'short',
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+      });
+      document.getElementById('dateTime').textContent = date;
+
+      const seconds = now.getSeconds();
+      const minutes = now.getMinutes();
+      const hours = now.getHours();
+      document.getElementById('secondHand').style.transform = `translateX(-50%) rotate(${seconds * 6}deg)`;
+      document.getElementById('minuteHand').style.transform = `translateX(-50%) rotate(${minutes * 6 + seconds * 0.1}deg)`;
+      document.getElementById('hourHand').style.transform = `translateX(-50%) rotate(${(hours % 12) * 30 + minutes * 0.5}deg)`;
+    }
+
+    updateDateTime();
+    setInterval(updateDateTime, 1000);
+  </script>
+</body>
+</html>
