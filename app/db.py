@@ -1,151 +1,140 @@
-import json
-from pathlib import Path
-from typing import Dict, Any, List
-import uuid
 import os
+import uuid
+from typing import Dict, Any, List, Optional
+from supabase import create_client, Client
 
-DB_DIR = Path(os.getenv("DATA_DIR", "data"))
-DB_DIR.mkdir(parents=True, exist_ok=True)
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "")
 
-# Für SPK und CoBa werden getrennte JSON-Dateien verwendet.
-# SPK:  data/memory.json
-# CoBa: data/memory_coba.json
-
-def _get_db_file(scope: str = "spk") -> Path:
-    suffix = "" if scope == "spk" else f"_{scope}"
-    return DB_DIR / f"memory{suffix}.json"
+_client: Optional[Client] = None
 
 
-def _ensure_db(scope: str = "spk"):
-    db_file = _get_db_file(scope)
-    if not db_file.exists():
-        initial_data = {
-            "entries": [],
-            "rules": [],
-            "corrections": {}
-        }
-        db_file.write_text(json.dumps(initial_data, ensure_ascii=False, indent=2), encoding="utf-8")
+def get_client() -> Client:
+    global _client
+    if _client is None:
+        _client = create_client(SUPABASE_URL, SUPABASE_KEY)
+    return _client
 
 
-_ensure_db()
-
-
-def load_memory(scope: str = "spk") -> Dict[str, Any]:
-    """Lädt die komplette Datenbank für einen Bereich (z. B. spk oder coba)."""
-    _ensure_db(scope)
-    db_file = _get_db_file(scope)
-    return json.loads(db_file.read_text(encoding="utf-8"))
-
-
-def save_memory(data: Dict[str, Any], scope: str = "spk") -> None:
-    """Speichert die komplette Datenbank für einen Bereich."""
-    db_file = _get_db_file(scope)
-    db_file.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
-
-
-def add_entry(entry: Dict[str, Any], scope: str = "spk") -> None:
-    """Fügt einen Eintrag zur Historie hinzu (Legacy)."""
-    data = load_memory(scope)
-    data["entries"].append(entry)
-    save_memory(data, scope)
-
-
-# ============ REGELN (Neue Funktionen) ============
+# ============ REGELN ============
 
 def add_rule(rule: Dict[str, Any], scope: str = "spk") -> str:
-    """Speichert eine neue Regel und gibt die ID zurück."""
-    data = load_memory(scope)
-    if "rules" not in data:
-        data["rules"] = []
+    sb = get_client()
     rule_id = rule.get("id") or str(uuid.uuid4())
-    rule["id"] = rule_id
-    data["rules"].append(rule)
-    save_memory(data, scope)
+    row = {
+        "id": rule_id,
+        "scope": scope,
+        "column_name": rule.get("column", ""),
+        "condition": rule.get("condition", ""),
+        "match_value": rule.get("value", ""),
+        "second_column": rule.get("second_column") or None,
+        "second_condition": rule.get("second_condition") or None,
+        "second_value": rule.get("second_value") or None,
+        "result_hint": rule.get("result_hint", ""),
+        "result_description": rule.get("result_description", ""),
+        "active": rule.get("active", True),
+    }
+    sb.table("rules").upsert(row).execute()
     return rule_id
 
 
 def get_all_rules(scope: str = "spk") -> List[Dict[str, Any]]:
-    """Gibt alle aktiven Regeln für einen Bereich zurück."""
-    data = load_memory(scope)
-    return [r for r in data.get("rules", []) if r.get("active", True)]
+    sb = get_client()
+    result = sb.table("rules").select("*").eq("scope", scope).eq("active", True).execute()
+    rows = result.data or []
+    for row in rows:
+        row["column"] = row.pop("column_name", "")
+        row["value"] = row.pop("match_value", "")
+    return rows
 
 
 def delete_rule(rule_id: str, scope: str = "spk") -> bool:
-    """Deaktiviert eine Regel."""
-    data = load_memory(scope)
-    for rule in data.get("rules", []):
-        if rule.get("id") == rule_id:
-            rule["active"] = False
-            save_memory(data, scope)
-            return True
-    return False
+    sb = get_client()
+    sb.table("rules").update({"active": False}).eq("id", rule_id).eq("scope", scope).execute()
+    return True
 
 
 def update_rule(rule_id: str, rule_data: Dict[str, Any], scope: str = "spk") -> bool:
-    """Aktualisiert eine Regel."""
-    data = load_memory(scope)
-    for rule in data.get("rules", []):
-        if rule.get("id") == rule_id:
-            rule.update(rule_data)
-            save_memory(data, scope)
-            return True
-    return False
+    sb = get_client()
+    row = {
+        "column_name": rule_data.get("column", ""),
+        "condition": rule_data.get("condition", ""),
+        "match_value": rule_data.get("value", ""),
+        "second_column": rule_data.get("second_column") or None,
+        "second_condition": rule_data.get("second_condition") or None,
+        "second_value": rule_data.get("second_value") or None,
+        "result_hint": rule_data.get("result_hint", ""),
+        "result_description": rule_data.get("result_description", ""),
+        "active": rule_data.get("active", True),
+    }
+    sb.table("rules").update(row).eq("id", rule_id).eq("scope", scope).execute()
+    return True
 
 
-# ============ KORREKTIONEN (Benutzer-Eingaben) ============
+# ============ KORREKTIONEN ============
 
 def save_correction(key: str, hinweis: str, beschreibung: str = "", scope: str = "spk") -> None:
-    """Speichert einen Hinweis (+ optional Beschreibung) für einen Schlüssel."""
-    data = load_memory(scope)
-    if "corrections" not in data:
-        data["corrections"] = {}
-    data["corrections"][key] = {"hinweis": hinweis, "beschreibung": beschreibung}
-    save_memory(data, scope)
+    sb = get_client()
+    row = {"scope": scope, "key": key, "hinweis": hinweis, "beschreibung": beschreibung}
+    sb.table("corrections").upsert(row, on_conflict="scope,key").execute()
 
 
-def get_correction(key: str, scope: str = "spk") -> Dict[str, str] | None:
-    """Holt einen gespeicherten Hinweis und Beschreibung für einen Schlüssel."""
-    data = load_memory(scope)
-    return data.get("corrections", {}).get(key)
-
-
-def save_all_corrections(corrections_dict: Dict[str, Dict[str, str]], scope: str = "spk") -> None:
-    """Speichert mehrere Korrekturen auf einmal (key -> {hinweis, beschreibung})."""
-    data = load_memory(scope)
-    if "corrections" not in data:
-        data["corrections"] = {}
-    for key, item in corrections_dict.items():
-        data["corrections"][key] = {
-            "hinweis": item.get("hinweis", ""),
-            "beschreibung": item.get("beschreibung", "")
-        }
-    save_memory(data, scope)
-
-
-# ============ LEGACY Funktionen für Kompatibilität ============
-
-def find_by_kundennummer(kundennummer: str) -> Dict[str, Any] | None:
-    data = load_memory()
-    for e in data.get("entries", []):
-        if e.get("kundennummer") == kundennummer:
-            return e
+def get_correction(key: str, scope: str = "spk") -> Optional[Dict[str, str]]:
+    sb = get_client()
+    result = (
+        sb.table("corrections")
+        .select("hinweis,beschreibung")
+        .eq("scope", scope)
+        .eq("key", key)
+        .limit(1)
+        .execute()
+    )
+    if result.data:
+        return result.data[0]
     return None
 
 
-def find_by_company(company: str) -> Dict[str, Any] | None:
-    if not company:
-        return None
-    company_low = company.lower().strip()
-    data = load_memory()
-    best = None
-    for e in data.get("entries", []):
-        c = (e.get("company") or "").lower()
-        if company_low and c and company_low in c:
-            return e
-    # fallback substring search
-    for e in data.get("entries", []):
-        c = (e.get("company") or "").lower()
-        if c and c in company_low:
-            return e
+def save_all_corrections(corrections_dict: Dict[str, Dict[str, str]], scope: str = "spk") -> None:
+    sb = get_client()
+    rows = [
+        {
+            "scope": scope,
+            "key": k,
+            "hinweis": v.get("hinweis", ""),
+            "beschreibung": v.get("beschreibung", ""),
+        }
+        for k, v in corrections_dict.items()
+    ]
+    if rows:
+        sb.table("corrections").upsert(rows, on_conflict="scope,key").execute()
+
+
+# ============ LEGACY SHIMS ============
+
+def load_memory(scope: str = "spk") -> Dict[str, Any]:
+    sb = get_client()
+    rules = get_all_rules(scope)
+    corr_result = (
+        sb.table("corrections")
+        .select("key,hinweis,beschreibung")
+        .eq("scope", scope)
+        .execute()
+    )
+    corrections = {
+        r["key"]: {"hinweis": r["hinweis"], "beschreibung": r["beschreibung"]}
+        for r in (corr_result.data or [])
+    }
+    return {"entries": [], "rules": rules, "corrections": corrections}
+
+
+def add_entry(entry: Dict[str, Any], scope: str = "spk") -> None:
+    pass  # Legacy – nicht mehr verwendet
+
+
+def find_by_kundennummer(kundennummer: str) -> Optional[Dict[str, Any]]:
+    return None
+
+
+def find_by_company(company: str) -> Optional[Dict[str, Any]]:
     return None
 

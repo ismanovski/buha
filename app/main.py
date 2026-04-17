@@ -9,7 +9,8 @@ from .parser import parse_csv_sparkasse
 from .db import (
     add_entry, load_memory, find_by_kundennummer, find_by_company,
     add_rule, get_all_rules, delete_rule, update_rule,
-    save_correction, get_correction, save_all_corrections
+    save_correction, get_correction, save_all_corrections,
+    get_client
 )
 from .models import Correction, Rule, Transaction
 
@@ -129,29 +130,28 @@ def handbuch():
     return HTMLResponse(html)
 
 
-HANDBUCH_SAVE_PATH = os.path.join(DATA_DIR, "handbuch.json")
 HANDBUCH_DOCX_PATH = "static/Handbuch Buchhaltung.docx"
 
 
 @app.get("/handbuch/content")
 def handbuch_content():
-    # Gespeicherter Stand hat Vorrang
-    if os.path.exists(HANDBUCH_SAVE_PATH):
-        with open(HANDBUCH_SAVE_PATH, "r", encoding="utf-8") as f:
-            return JSONResponse(json.load(f))
+    sb = get_client()
+    result = sb.table("handbuch").select("*").eq("id", 1).limit(1).execute()
+    if result.data:
+        row = result.data[0]
+        return JSONResponse({"html": row.get("html", ""), "delta": row.get("delta"), "annotations": row.get("annotations", "")})
     # Fallback: docx einlesen und als HTML liefern
     if os.path.exists(HANDBUCH_DOCX_PATH):
         with open(HANDBUCH_DOCX_PATH, "rb") as f:
-            result = mammoth.convert_to_html(f)
-        return JSONResponse({"html": result.value, "delta": None, "annotations": ""})
+            doc_result = mammoth.convert_to_html(f)
+        return JSONResponse({"html": doc_result.value, "delta": None, "annotations": ""})
     return JSONResponse({"html": "", "delta": None, "annotations": ""})
 
 
 @app.post("/handbuch/save")
 async def handbuch_save(payload: dict):
-    os.makedirs(DATA_DIR, exist_ok=True)
-    with open(HANDBUCH_SAVE_PATH, "w", encoding="utf-8") as f:
-        json.dump(payload, f, ensure_ascii=False)
+    sb = get_client()
+    sb.table("handbuch").upsert({"id": 1, "html": payload.get("html", ""), "delta": payload.get("delta"), "annotations": payload.get("annotations", "")}).execute()
     return {"status": "gespeichert"}
 
 
@@ -173,22 +173,26 @@ def re_buchung_manage():
     return HTMLResponse(html)
 
 
-RE_PROJECTS_PATH = os.path.join(DATA_DIR, "re_projects.json")
-RE_SUGGESTIONS_PATH = os.path.join(DATA_DIR, "re_suggestions.json")
-
-
 @app.get("/re/api/projects")
 def re_api_list_projects():
-    projects = _read_json_list(RE_PROJECTS_PATH)
-    projects.sort(key=lambda item: str(item.get("updatedAt", "")), reverse=True)
+    sb = get_client()
+    result = sb.table("re_projects").select("id,name,pdf_data_url,stamps,created_at,updated_at").order("updated_at", desc=True).execute()
+    projects = [
+        {"id": r["id"], "name": r["name"], "pdfDataUrl": r["pdf_data_url"],
+         "stamps": r["stamps"] or [], "createdAt": r["created_at"], "updatedAt": r["updated_at"]}
+        for r in (result.data or [])
+    ]
     return {"projects": projects}
 
 
 @app.get("/re/api/projects/{project_id}")
 def re_api_get_project(project_id: str):
-    for project in _read_json_list(RE_PROJECTS_PATH):
-        if str(project.get("id", "")) == project_id:
-            return project
+    sb = get_client()
+    result = sb.table("re_projects").select("*").eq("id", project_id).limit(1).execute()
+    if result.data:
+        r = result.data[0]
+        return {"id": r["id"], "name": r["name"], "pdfDataUrl": r["pdf_data_url"],
+                "stamps": r["stamps"] or [], "createdAt": r["created_at"], "updatedAt": r["updated_at"]}
     raise HTTPException(status_code=404, detail="Projekt nicht gefunden")
 
 
@@ -198,44 +202,38 @@ async def re_api_save_project(payload: dict):
     if not project_id:
         raise HTTPException(status_code=400, detail="Projekt-ID fehlt")
 
-    projects = _read_json_list(RE_PROJECTS_PATH)
+    sb = get_client()
     now_iso = _now_iso()
+    existing_result = sb.table("re_projects").select("created_at").eq("id", project_id).limit(1).execute()
+    created_at = payload.get("createdAt") or (existing_result.data[0]["created_at"] if existing_result.data else now_iso)
 
-    existing = None
-    for idx, project in enumerate(projects):
-        if str(project.get("id", "")) == project_id:
-            existing = (idx, project)
-            break
-
-    next_payload = {
+    row = {
         "id": project_id,
         "name": payload.get("name", "RE Buchung"),
-        "pdfDataUrl": payload.get("pdfDataUrl", ""),
+        "pdf_data_url": payload.get("pdfDataUrl", ""),
         "stamps": payload.get("stamps", []),
-        "createdAt": payload.get("createdAt") or (existing[1].get("createdAt") if existing else now_iso),
-        "updatedAt": now_iso,
+        "created_at": created_at,
+        "updated_at": now_iso,
     }
-
-    if existing:
-        projects[existing[0]] = next_payload
-    else:
-        projects.append(next_payload)
-
-    _write_json_list(RE_PROJECTS_PATH, projects)
-    return next_payload
+    sb.table("re_projects").upsert(row).execute()
+    return {"id": project_id, "name": row["name"], "pdfDataUrl": row["pdf_data_url"],
+            "stamps": row["stamps"], "createdAt": row["created_at"], "updatedAt": row["updated_at"]}
 
 
 @app.delete("/re/api/projects/{project_id}")
 def re_api_delete_project(project_id: str):
-    projects = _read_json_list(RE_PROJECTS_PATH)
-    kept = [project for project in projects if str(project.get("id", "")) != project_id]
-    _write_json_list(RE_PROJECTS_PATH, kept)
+    sb = get_client()
+    sb.table("re_projects").delete().eq("id", project_id).execute()
     return {"status": "gelöscht"}
 
 
 @app.get("/re/api/suggestions")
 def re_api_get_suggestions():
-    return {"suggestions": _read_json_list(RE_SUGGESTIONS_PATH)}
+    sb = get_client()
+    result = sb.table("re_suggestions").select("suggestions").eq("id", 1).limit(1).execute()
+    if result.data:
+        return {"suggestions": result.data[0]["suggestions"] or []}
+    return {"suggestions": []}
 
 
 @app.post("/re/api/suggestions")
@@ -243,7 +241,8 @@ async def re_api_save_suggestions(payload: dict):
     suggestions = payload.get("suggestions", [])
     if not isinstance(suggestions, list):
         raise HTTPException(status_code=400, detail="Suggestions müssen eine Liste sein")
-    _write_json_list(RE_SUGGESTIONS_PATH, suggestions)
+    sb = get_client()
+    sb.table("re_suggestions").upsert({"id": 1, "suggestions": suggestions}).execute()
     return {"status": "gespeichert", "count": len(suggestions)}
 
 
@@ -363,24 +362,6 @@ def _apply_rule(transaction: dict, rule: dict) -> bool:
         return _matches_rule_condition(transaction, second_column, second_condition, second_value)
 
     return True
-
-
-def _read_json_list(path: str):
-    if not os.path.exists(path):
-        return []
-
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            loaded = json.load(f)
-        return loaded if isinstance(loaded, list) else []
-    except Exception:
-        return []
-
-
-def _write_json_list(path: str, items: list):
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(items, f, ensure_ascii=False)
 
 
 def _now_iso():
