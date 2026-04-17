@@ -246,6 +246,172 @@ async def re_api_save_suggestions(payload: dict):
     return {"status": "gespeichert", "count": len(suggestions)}
 
 
+@app.get("/rka")
+def rka_index():
+    html = open("static/rka.html", "r", encoding="utf-8").read()
+    return HTMLResponse(html)
+
+
+# ============ RKA ENDPUNKTE ============
+
+RKA_USERS_FILE = os.path.join("data", "rka_users.json")
+RKA_DATA_FILE = os.path.join("data", "rka_data.json")
+RKA_BESCHREIBUNGEN_FILE = os.path.join("data", "rka_beschreibungen.json")
+RKA_KONTIERUNGEN_FILE = os.path.join("data", "rka_kontierungen.json")
+
+import hashlib
+from datetime import datetime, timezone, timedelta
+
+
+def _rka_hash(password: str) -> str:
+    return hashlib.sha256(password.encode("utf-8")).hexdigest()
+
+
+def _load_json_file(path: str, default):
+    if os.path.exists(path):
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return default
+
+
+def _save_json_file(path: str, data):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+
+@app.post("/rka/register")
+async def rka_register(payload: dict):
+    kuerzel = str(payload.get("kuerzel", "")).strip().upper()
+    kreditor = str(payload.get("kreditor", "")).strip()
+    password = str(payload.get("password", "")).strip()
+    if not kuerzel or not kreditor or not password:
+        raise HTTPException(status_code=400, detail="Kürzel, Kreditor-Nr. und Passwort erforderlich")
+    users = _load_json_file(RKA_USERS_FILE, {})
+    if kuerzel in users:
+        raise HTTPException(status_code=409, detail="Kürzel bereits vergeben")
+    users[kuerzel] = {"kreditor": kreditor, "password_hash": _rka_hash(password)}
+    _save_json_file(RKA_USERS_FILE, users)
+    return {"status": "registriert", "kuerzel": kuerzel}
+
+
+@app.post("/rka/login")
+async def rka_login(payload: dict):
+    identifier = str(payload.get("identifier", "")).strip().upper()
+    password = str(payload.get("password", "")).strip()
+    # BUHA Admin
+    if identifier == "BUHA" and password == "buhaadmin":
+        return {"status": "ok", "kuerzel": "BUHA", "kreditor": "ADMIN", "is_admin": True}
+    users = _load_json_file(RKA_USERS_FILE, {})
+    # Suche nach Kürzel oder Kreditor
+    found = None
+    for k, v in users.items():
+        if k == identifier or v.get("kreditor") == identifier:
+            found = (k, v)
+            break
+    if not found:
+        raise HTTPException(status_code=401, detail="Benutzer nicht gefunden")
+    kuerzel, user = found
+    if user["password_hash"] != _rka_hash(password):
+        raise HTTPException(status_code=401, detail="Falsches Passwort")
+    return {"status": "ok", "kuerzel": kuerzel, "kreditor": user["kreditor"], "is_admin": False}
+
+
+@app.post("/rka/save")
+async def rka_save(payload: dict):
+    kuerzel = str(payload.get("kuerzel", "")).strip().upper()
+    if not kuerzel:
+        raise HTTPException(status_code=400, detail="Kürzel fehlt")
+    rka_id = str(payload.get("id", "")).strip() or f"{kuerzel}_{_now_iso().replace(':', '-')}"
+    data = _load_json_file(RKA_DATA_FILE, {})
+    if kuerzel not in data:
+        data[kuerzel] = {}
+    data[kuerzel][rka_id] = {
+        "id": rka_id,
+        "kuerzel": kuerzel,
+        "kreditor": payload.get("kreditor", ""),
+        "tage": payload.get("tage", []),
+        "sonstige_vm": payload.get("sonstige_vm", []),
+        "treibstoff": payload.get("treibstoff", []),
+        "verpflegung": payload.get("verpflegung", []),
+        "repraesentation": payload.get("repraesentation", []),
+        "nebenkosten": payload.get("nebenkosten", []),
+        "gesamtsumme": payload.get("gesamtsumme", 0),
+        "eingereicht": payload.get("eingereicht", False),
+        "created_at": data[kuerzel].get(rka_id, {}).get("created_at") or _now_iso(),
+        "updated_at": _now_iso(),
+    }
+    _save_json_file(RKA_DATA_FILE, data)
+    return {"status": "gespeichert", "id": rka_id}
+
+
+@app.get("/rka/list")
+async def rka_list(kuerzel: str, is_admin: bool = False):
+    kuerzel = kuerzel.strip().upper()
+    data = _load_json_file(RKA_DATA_FILE, {})
+    cutoff = datetime.now(timezone.utc) - timedelta(days=30)
+    result = []
+    if is_admin:
+        all_entries = {k: v for kk, entries in data.items() for k, v in entries.items()}
+    else:
+        all_entries = data.get(kuerzel, {})
+    for rka_id, rka in all_entries.items():
+        created = rka.get("created_at", "")
+        try:
+            created_dt = datetime.fromisoformat(created)
+            if created_dt.tzinfo is None:
+                created_dt = created_dt.replace(tzinfo=timezone.utc)
+            if created_dt < cutoff:
+                continue
+        except Exception:
+            pass
+        result.append(rka)
+    result.sort(key=lambda x: x.get("created_at", ""), reverse=True)
+    return {"rka_list": result}
+
+
+@app.delete("/rka/{rka_id}")
+async def rka_delete(rka_id: str, kuerzel: str):
+    kuerzel = kuerzel.strip().upper()
+    data = _load_json_file(RKA_DATA_FILE, {})
+    if kuerzel in data and rka_id in data[kuerzel]:
+        del data[kuerzel][rka_id]
+        _save_json_file(RKA_DATA_FILE, data)
+        return {"status": "gelöscht"}
+    raise HTTPException(status_code=404, detail="RKA nicht gefunden")
+
+
+@app.get("/rka/beschreibungen/{kuerzel}")
+async def rka_get_beschreibungen(kuerzel: str):
+    kuerzel = kuerzel.strip().upper()
+    data = _load_json_file(RKA_BESCHREIBUNGEN_FILE, {})
+    return {"beschreibungen": data.get(kuerzel, [])}
+
+
+@app.post("/rka/beschreibungen/{kuerzel}")
+async def rka_save_beschreibungen(kuerzel: str, payload: dict):
+    kuerzel = kuerzel.strip().upper()
+    data = _load_json_file(RKA_BESCHREIBUNGEN_FILE, {})
+    beschreibungen = payload.get("beschreibungen", [])
+    data[kuerzel] = list(set(beschreibungen))
+    _save_json_file(RKA_BESCHREIBUNGEN_FILE, data)
+    return {"status": "gespeichert"}
+
+
+@app.get("/rka/kontierungen")
+async def rka_get_kontierungen():
+    return _load_json_file(RKA_KONTIERUNGEN_FILE, {})
+
+
+@app.post("/rka/kontierungen")
+async def rka_save_kontierungen(payload: dict):
+    _save_json_file(RKA_KONTIERUNGEN_FILE, payload)
+    return {"status": "gespeichert"}
+
+
 @app.get("/")
 def index():
     html = open("static/index.html", "r", encoding="utf-8").read()
