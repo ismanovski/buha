@@ -142,6 +142,12 @@
       }
       @page { size: A4 portrait; margin: 3.0cm 1.6cm; }
     }
+    .kontostand-box { background: white; border-radius: 14px; border: 1px solid #cbd5e1; padding: 16px 20px; margin-bottom: 14px; box-shadow: 0 3px 15px rgba(0,0,0,0.05); }
+    .kontostand-label { font-size: 12px; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 4px; }
+    .kontostand-value { font-size: 2.4rem; font-weight: 900; line-height: 1.1; }
+    .kontostand-value.positive { color: #16a34a; }
+    .kontostand-value.negative { color: #dc2626; }
+    .kontostand-date { font-size: 13px; color: #6b7280; margin-top: 6px; }
   </style>
 </head>
 <body>
@@ -175,6 +181,7 @@
       <button id="exportBtn" disabled>Exportieren</button>
       <button id="printBtn" disabled>Drucken</button>
       <button id="finalSaveBtn" disabled>Alle Hinweise speichern</button>
+      <button id="setKontostandBtn">Kontostand setzen</button>
     </div>
 
     <div id="rulesPanel" class="rules-panel hidden">
@@ -222,6 +229,19 @@
       <div class="rules-list" id="rulesListContainer"></div>
     </div>
 
+    <div id="kontostandPanel" class="rules-panel hidden">
+      <strong>Kontostand manuell setzen</strong>
+      <div style="margin-top:10px; display:grid; grid-template-columns: 1fr 1fr; gap:8px; align-items:center;">
+        <input type="number" id="kontostandInput" placeholder="Kontostand in € (z.B. 100000)" step="0.01" style="padding:9px; border-radius:6px; border:1px solid #94a3b8;" />
+        <input type="date" id="kontostandDatum" style="padding:9px; border-radius:6px; border:1px solid #94a3b8;" />
+      </div>
+      <div style="margin-top:8px; display:flex; justify-content:flex-end; gap:8px;">
+        <button id="saveKontostandBtn" class="small-btn">Kontostand speichern</button>
+        <button id="resetKontostandBtn" class="small-btn">Zurücksetzen</button>
+      </div>
+      <small>Der gespeicherte Kontostand wird bei jedem neuen Kontoauszug automatisch aktualisiert.</small>
+    </div>
+
     <div id="status"></div>
 
     <div id="editRuleModal" class="modal hidden">
@@ -267,6 +287,11 @@
     </div>
 
     <div id="print-area">
+      <div id="kontostand-display" class="kontostand-box" style="display:none;">
+        <div class="kontostand-label">Kontostand</div>
+        <div id="kontostand-value" class="kontostand-value"></div>
+        <div id="kontostand-date" class="kontostand-date"></div>
+      </div>
       <table id="transaction-table" class="hidden">
         <thead>
           <tr>
@@ -314,6 +339,44 @@
     const exportFormat = document.getElementById('exportFormat');
 
     let currentTransactions = [];
+    const STORAGE_KEY_COBA = 'coba_kontostand';
+
+    function parseGermanAmount(str) {
+      if (!str) return 0;
+      const cleaned = String(str).trim().replace(/\./g, '').replace(',', '.');
+      const val = parseFloat(cleaned);
+      return isNaN(val) ? 0 : val;
+    }
+
+    function formatKontostand(value) {
+      return value.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
+    }
+
+    function loadKontostand() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY_COBA);
+        if (!raw) return null;
+        return JSON.parse(raw);
+      } catch { return null; }
+    }
+
+    function saveKontostand(betrag, datum) {
+      localStorage.setItem(STORAGE_KEY_COBA, JSON.stringify({ betrag, datum }));
+    }
+
+    function updateKontostandDisplay() {
+      const stored = loadKontostand();
+      const box = document.getElementById('kontostand-display');
+      const valueEl = document.getElementById('kontostand-value');
+      const dateEl = document.getElementById('kontostand-date');
+      if (!stored) { box.style.display = 'none'; return; }
+      box.style.display = '';
+      const isPositive = stored.betrag >= 0;
+      valueEl.textContent = formatKontostand(stored.betrag);
+      valueEl.className = 'kontostand-value ' + (isPositive ? 'positive' : 'negative');
+      const d = stored.datum ? new Date(stored.datum + 'T00:00:00').toLocaleDateString('de-DE', {day:'2-digit', month:'2-digit', year:'numeric'}) : '';
+      dateEl.textContent = d ? 'Stand vom: ' + d : '';
+    }
 
     function translateRule(rule) {
       const columnMap = {
@@ -482,6 +545,19 @@
 
     function buildPrintableDocument(title) {
       const tableHtml = getPrintableTableHtml();
+      const stored = loadKontostand();
+      let balanceHtml = '';
+      if (stored !== null) {
+        const isPositive = stored.betrag >= 0;
+        const colorStyle = isPositive ? 'color:#16a34a;' : 'color:#dc2626;';
+        const formatted = formatKontostand(stored.betrag);
+        const datumFormatted = stored.datum ? new Date(stored.datum + 'T00:00:00').toLocaleDateString('de-DE', {day:'2-digit', month:'2-digit', year:'numeric'}) : '';
+        balanceHtml = '<div style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:10px;padding:14px 20px;margin-bottom:18px;">'
+          + '<div style="font-size:10px;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;">Kontostand</div>'
+          + '<div style="font-size:28px;font-weight:900;' + colorStyle + '">' + formatted + '</div>'
+          + (datumFormatted ? '<div style="font-size:10px;color:#6b7280;margin-top:4px;">Stand vom: ' + datumFormatted + '</div>' : '')
+          + '</div>';
+      }
 
       return `<!DOCTYPE html>
 <html lang="de">
@@ -507,6 +583,7 @@
 <body>
   <div class="print-wrap">
     <h1>${escapeHtml(title)}</h1>
+    ${balanceHtml}
     <div class="table-wrap">${tableHtml}</div>
   </div>
 </body>
@@ -784,6 +861,14 @@
         currentTransactions = body.transactions.map(tx=>({ ...tx, beschreibung: tx.beschreibung || '', hinweis: tx.hinweis || '' }));
         await applySavedCorrections();
         await applyRules();
+        const csvSum = currentTransactions.reduce((sum, tx) => sum + parseGermanAmount(tx.betrag), 0);
+        const storedKst = loadKontostand();
+        if (storedKst !== null) {
+          const newBetrag = storedKst.betrag + csvSum;
+          const today = new Date().toISOString().slice(0, 10);
+          saveKontostand(newBetrag, today);
+          updateKontostandDisplay();
+        }
         setStatus(`CSV geprüft. ${body.row_count} Einträge geladen.`, 'success');
         exportBtn.disabled=false; printBtn.disabled=false; finalSaveBtn.disabled=false;
       } catch (e) {
@@ -951,6 +1036,32 @@
       document.getElementById('editRuleModal').classList.add('hidden');
     });
 
+    document.getElementById('setKontostandBtn').addEventListener('click', () => {
+      const panel = document.getElementById('kontostandPanel');
+      panel.classList.toggle('hidden');
+    });
+
+    document.getElementById('saveKontostandBtn').addEventListener('click', () => {
+      const input = document.getElementById('kontostandInput');
+      const datumInput = document.getElementById('kontostandDatum');
+      const betrag = parseFloat(String(input.value).replace(',', '.'));
+      if (isNaN(betrag)) { setStatus('Bitte einen gültigen Betrag eingeben.', 'error'); return; }
+      const datum = datumInput.value || new Date().toISOString().slice(0, 10);
+      saveKontostand(betrag, datum);
+      updateKontostandDisplay();
+      document.getElementById('kontostandPanel').classList.add('hidden');
+      input.value = '';
+      setStatus('Kontostand gespeichert.', 'success');
+    });
+
+    document.getElementById('resetKontostandBtn').addEventListener('click', () => {
+      if (!confirm('Kontostand wirklich zurücksetzen?')) return;
+      localStorage.removeItem(STORAGE_KEY_COBA);
+      updateKontostandDisplay();
+      setStatus('Kontostand zurückgesetzt.', 'success');
+    });
+
+    updateKontostandDisplay();
     applySavedCorrections();
   </script>
 </body>
