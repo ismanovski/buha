@@ -89,15 +89,18 @@
       grid-template-columns: 320px 1fr;
       gap: 20px;
       padding: 20px;
-      align-items: start;
+      align-items: stretch;
+      height: calc(100vh - 92px);
+      overflow: hidden;
     }
 
     .sidebar {
-      position: sticky;
-      top: 92px;
       display: flex;
       flex-direction: column;
       gap: 16px;
+      min-height: 0;
+      overflow: auto;
+      padding-right: 6px;
     }
 
     .panel {
@@ -283,6 +286,7 @@
       display: flex;
       flex-direction: column;
       gap: 16px;
+      min-height: 0;
     }
 
     .viewer-header {
@@ -299,7 +303,8 @@
     }
 
     .pdf-area {
-      min-height: calc(100vh - 160px);
+      min-height: 0;
+      height: 100%;
       padding: 20px;
       background: linear-gradient(180deg, #eef2f7, #f8fafc);
       border: 1px solid var(--border);
@@ -308,6 +313,7 @@
       display: flex;
       flex-direction: column;
       gap: 20px;
+      overflow: auto;
     }
 
     .empty-state {
@@ -607,10 +613,17 @@
     @media (max-width: 1100px) {
       .layout {
         grid-template-columns: 1fr;
+        height: auto;
+        overflow: visible;
       }
 
       .sidebar {
-        position: static;
+        overflow: visible;
+      }
+
+      .pdf-area {
+        min-height: calc(100vh - 240px);
+        height: auto;
       }
     }
 
@@ -772,7 +785,6 @@
     </div>
   </div>
 
-  <script src="/static/vendor/html2canvas.min.js"></script>
   <script src="/static/vendor/jspdf.umd.min.js"></script>
   <script src="/static/re_buchung_store.js"></script>
   <script type="module">
@@ -818,6 +830,18 @@
     const closePreviewBtn = document.getElementById('closePreviewBtn');
 
     let suggestionHistoryCache = [];
+    const EXPORT_RENDER_SCALE = 2.2;
+    const EXPORT_IMAGE_TYPE = 'image/jpeg';
+    const EXPORT_IMAGE_QUALITY = 0.98;
+
+    function parseSuggestionTime(value) {
+      const time = Date.parse(String(value || ''));
+      return Number.isNaN(time) ? 0 : time;
+    }
+
+    function normalizedInvoiceName(value) {
+      return String(value || '').trim().toLowerCase();
+    }
 
     function updateDateTime() {
       const now = new Date();
@@ -871,6 +895,32 @@
       updateSaveActionButtons();
       downloadPdfBtn.disabled = !loaded;
       printBtn.disabled = !loaded;
+    }
+
+    function attachIndependentScroll(host) {
+      if (!host) return;
+      host.addEventListener('wheel', (event) => {
+        const canScroll = host.scrollHeight > host.clientHeight;
+        if (!canScroll) return;
+
+        const goingDown = event.deltaY > 0;
+        const goingUp = event.deltaY < 0;
+        const atTop = host.scrollTop <= 0;
+        const atBottom = host.scrollTop + host.clientHeight >= host.scrollHeight - 1;
+
+        if ((goingDown && atBottom) || (goingUp && atTop)) {
+          return;
+        }
+
+        event.preventDefault();
+        host.scrollTop += event.deltaY;
+      }, { passive: false });
+    }
+
+    function setupIndependentScrollZones() {
+      const sidebarNode = document.querySelector('.sidebar');
+      attachIndependentScroll(sidebarNode);
+      attachIndependentScroll(pdfArea);
     }
 
     async function loadSuggestionHistory() {
@@ -977,13 +1027,26 @@
     function findSuggestionsForKreditorInput(query) {
       const value = String(query || '').trim().toLowerCase();
       if (!value) return [];
-      return getSuggestionHistory()
+      const matches = getSuggestionHistory()
         .filter((entry) => {
           const kreditor = String(entry.kreditor || '').toLowerCase();
           const invoiceName = String(entry.invoiceName || '').toLowerCase();
           return kreditor.includes(value) || invoiceName.includes(value);
         })
-        .slice(0, 6);
+        .sort((a, b) => parseSuggestionTime(b.updatedAt) - parseSuggestionTime(a.updatedAt));
+
+      const byInvoiceName = new Set();
+      const uniqueMatches = [];
+
+      matches.forEach((entry) => {
+        const nameKey = normalizedInvoiceName(entry.invoiceName);
+        const dedupeKey = nameKey || `__no_invoice_name__${entry.id}`;
+        if (byInvoiceName.has(dedupeKey)) return;
+        byInvoiceName.add(dedupeKey);
+        uniqueMatches.push(entry);
+      });
+
+      return uniqueMatches.slice(0, 6);
     }
 
 
@@ -992,6 +1055,12 @@
       stamp.fields.kreditor = suggestion.kreditor || '';
       stamp.fields.kontierung = suggestion.kontierung || '';
       stamp.fields.freigabe = String(suggestion.freigabe || '').trim() ? 'Freigabe benoetigt!' : '';
+
+      const suggestedInvoiceName = String(suggestion.invoiceName || '').trim();
+      if (suggestedInvoiceName) {
+        invoiceNameInput.value = suggestedInvoiceName;
+        updateSaveActionButtons();
+      }
     }
 
     function resetForNextBooking() {
@@ -1450,24 +1519,216 @@
       resetForNextBooking();
     }
 
+    function drawWrappedText(ctx, text, x, y, maxWidth, lineHeight, maxLines = 12) {
+      const content = String(text || '').replace(/\s+/g, ' ').trim();
+      if (!content) return;
+
+      const words = content.split(' ');
+      let line = '';
+      let lineCount = 0;
+      let currentY = y;
+
+      for (let index = 0; index < words.length; index += 1) {
+        const testLine = line ? `${line} ${words[index]}` : words[index];
+        if (ctx.measureText(testLine).width <= maxWidth) {
+          line = testLine;
+          continue;
+        }
+
+        if (line) {
+          ctx.fillText(line, x, currentY);
+          lineCount += 1;
+          if (lineCount >= maxLines) return;
+          currentY += lineHeight;
+        }
+        line = words[index];
+      }
+
+      if (line && lineCount < maxLines) {
+        ctx.fillText(line, x, currentY);
+      }
+    }
+
+    function drawKontierungStampForExport(ctx, stamp, ratio) {
+      const scale = (Number(stamp.scale) || 1) * ratio;
+      const x = (Number(stamp.x) || 0) * ratio;
+      const y = (Number(stamp.y) || 0) * ratio;
+
+      const width = 340 * scale;
+      const leftCol = 126 * scale;
+      const rowA = 44 * scale;
+      const rowB = 44 * scale;
+      const rowC = 120 * scale;
+      const rowD = 44 * scale;
+      const height = rowA + rowB + rowC + rowD;
+      const border = Math.max(1.4, 3 * scale);
+      const pad = 8 * scale;
+
+      const y1 = y + rowA;
+      const y2 = y + rowA + rowB;
+      const y3 = y + rowA + rowB + rowC;
+      const splitX = x + leftCol;
+
+      ctx.save();
+      ctx.fillStyle = '#ffffff';
+      ctx.strokeStyle = '#111111';
+      ctx.lineWidth = border;
+
+      ctx.fillRect(x, y, width, height);
+      ctx.strokeRect(x, y, width, height);
+
+      ctx.beginPath();
+      ctx.moveTo(splitX, y);
+      ctx.lineTo(splitX, y + height);
+      ctx.moveTo(x, y1);
+      ctx.lineTo(x + width, y1);
+      ctx.moveTo(x, y2);
+      ctx.lineTo(x + width, y2);
+      ctx.moveTo(x, y3);
+      ctx.lineTo(x + width, y3);
+      ctx.stroke();
+
+      ctx.fillStyle = '#111111';
+      ctx.textBaseline = 'middle';
+      ctx.font = `${Math.max(11, 15 * scale)}px Arial`;
+
+      ctx.fillText('Int. Beleg-Nr.', x + pad, y + rowA / 2);
+      ctx.fillText('Kreditor', x + pad, y + rowA + rowB / 2);
+      ctx.fillText('Kontierung', x + pad, y + rowA + rowB + rowC / 2);
+      ctx.fillText('Freigabe', x + pad, y + rowA + rowB + rowC + rowD / 2);
+
+      ctx.font = `${Math.max(10, 14 * scale)}px Arial`;
+      ctx.textBaseline = 'middle';
+      ctx.fillText(String(stamp.fields.belegNr || ''), splitX + pad, y + rowA / 2);
+      ctx.fillText(String(stamp.fields.kreditor || ''), splitX + pad, y + rowA + rowB / 2);
+      ctx.fillText(String(stamp.fields.freigabe || ''), splitX + pad, y + rowA + rowB + rowC + rowD / 2);
+
+      ctx.textBaseline = 'top';
+      drawWrappedText(
+        ctx,
+        String(stamp.fields.kontierung || ''),
+        splitX + pad,
+        y + rowA + rowB + (pad * 0.9),
+        width - leftCol - (pad * 2),
+        Math.max(11, 16 * scale),
+        10
+      );
+
+      ctx.restore();
+    }
+
+    function drawGebuchtStampForExport(ctx, stamp, ratio, titleText) {
+      const scale = (Number(stamp.scale) || 1) * ratio;
+      const x = (Number(stamp.x) || 0) * ratio;
+      const y = (Number(stamp.y) || 0) * ratio;
+
+      const width = 250 * scale;
+      const height = 150 * scale;
+      const padX = 14 * scale;
+      const border = Math.max(1.6, 4 * scale);
+      const blue = '#11308e';
+      const red = '#d13138';
+
+      ctx.save();
+      ctx.fillStyle = '#ffffff';
+      ctx.strokeStyle = blue;
+      ctx.lineWidth = border;
+      ctx.fillRect(x, y, width, height);
+      ctx.strokeRect(x, y, width, height);
+
+      ctx.fillStyle = blue;
+      ctx.textBaseline = 'top';
+      ctx.font = `700 ${Math.max(20, 44 * scale)}px Arial`;
+      ctx.fillText(titleText, x + padX, y + (10 * scale));
+
+      ctx.fillStyle = red;
+      ctx.font = `700 ${Math.max(14, 24 * scale)}px Arial`;
+      ctx.fillText(String(stamp.fields.date || ''), x + padX, y + (62 * scale));
+
+      ctx.fillStyle = blue;
+      ctx.font = `700 ${Math.max(14, 24 * scale)}px Arial`;
+      ctx.fillText('durch', x + padX, y + (100 * scale));
+
+      const lineY = y + (124 * scale);
+      const lineStartX = x + (95 * scale);
+      const lineEndX = x + width - (14 * scale);
+
+      ctx.beginPath();
+      ctx.setLineDash([Math.max(2, 4 * scale), Math.max(2, 4 * scale)]);
+      ctx.strokeStyle = blue;
+      ctx.lineWidth = Math.max(1.2, 3 * scale);
+      ctx.moveTo(lineStartX, lineY);
+      ctx.lineTo(lineEndX, lineY);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      ctx.font = `700 ${Math.max(14, 22 * scale)}px Arial`;
+      ctx.fillText(String(stamp.fields.worker || ''), lineStartX + (6 * scale), y + (101 * scale));
+      ctx.restore();
+    }
+
+    function drawStampsForPage(ctx, pageIndex, ratio) {
+      state.stamps
+        .filter((stamp) => Number(stamp.pageIndex) === Number(pageIndex))
+        .forEach((stamp) => {
+          if (stamp.type === 'kontierung') {
+            drawKontierungStampForExport(ctx, stamp, ratio);
+            return;
+          }
+          const titleText = stamp.type === 'bezahlt' ? 'BEZAHLT' : 'GEBUCHT';
+          drawGebuchtStampForExport(ctx, stamp, ratio, titleText);
+        });
+    }
+
     async function renderStampedPagesToPdf() {
-      const pageNodes = [...document.querySelectorAll('.pdf-page .page-frame')];
+      if (!state.pdfDoc || !state.pages.length) {
+        return null;
+      }
+
       const { jsPDF } = window.jspdf;
       let pdf = null;
+      const totalPages = state.pdfDoc.numPages;
 
       document.body.classList.add('capture-mode');
-      for (let index = 0; index < pageNodes.length; index += 1) {
-        const frame = pageNodes[index];
-        const canvas = await html2canvas(frame, { scale: 2, backgroundColor: '#ffffff', useCORS: true });
-        const imageData = canvas.toDataURL('image/png');
-        if (!pdf) {
-          pdf = new jsPDF({ orientation: 'portrait', unit: 'px', format: [canvas.width, canvas.height] });
-        } else {
-          pdf.addPage([canvas.width, canvas.height], 'portrait');
+      try {
+        for (let pageIndex = 0; pageIndex < totalPages; pageIndex += 1) {
+          showMessage(`PDF wird erstellt... Seite ${pageIndex + 1}/${totalPages}`);
+
+          const page = await state.pdfDoc.getPage(pageIndex + 1);
+          const viewport = page.getViewport({ scale: EXPORT_RENDER_SCALE });
+          const canvas = document.createElement('canvas');
+          canvas.width = Math.ceil(viewport.width);
+          canvas.height = Math.ceil(viewport.height);
+
+          const context = canvas.getContext('2d', { alpha: false });
+          context.fillStyle = '#ffffff';
+          context.fillRect(0, 0, canvas.width, canvas.height);
+          await page.render({ canvasContext: context, viewport }).promise;
+
+          const displayPage = state.pages[pageIndex];
+          const ratio = displayPage && displayPage.width ? (viewport.width / displayPage.width) : 1;
+          drawStampsForPage(context, pageIndex, ratio);
+
+          const imageData = canvas.toDataURL(EXPORT_IMAGE_TYPE, EXPORT_IMAGE_QUALITY);
+          const orientation = viewport.width >= viewport.height ? 'landscape' : 'portrait';
+
+          if (!pdf) {
+            pdf = new jsPDF({
+              orientation,
+              unit: 'px',
+              format: [viewport.width, viewport.height],
+              compress: true,
+            });
+          } else {
+            pdf.addPage([viewport.width, viewport.height], orientation);
+          }
+
+          pdf.addImage(imageData, 'JPEG', 0, 0, viewport.width, viewport.height, undefined, 'FAST');
+          await new Promise((resolve) => setTimeout(resolve, 0));
         }
-        pdf.addImage(imageData, 'PNG', 0, 0, canvas.width, canvas.height);
+      } finally {
+        document.body.classList.remove('capture-mode');
       }
-      document.body.classList.remove('capture-mode');
 
       return pdf;
     }
@@ -1476,6 +1737,7 @@
       if (!state.pages.length) return;
       showMessage('PDF wird erstellt…');
       const pdf = await renderStampedPagesToPdf();
+      if (!pdf) return;
 
       pdf.save((state.currentFileName || 'RE_Buchung').replace(/\.pdf$/i, '') + '_gestempelt.pdf');
       showMessage('PDF wurde heruntergeladen.', 'success');
@@ -1485,6 +1747,7 @@
       if (!state.pages.length) return;
       showMessage('Druckausgabe wird vorbereitet…');
       const pdf = await renderStampedPagesToPdf();
+      if (!pdf) return;
       pdf.autoPrint();
       const blobUrl = pdf.output('bloburl');
 
@@ -1568,6 +1831,7 @@
     setInterval(updateDateTime, 1000);
     applyModeUi();
     setLoadedState(false);
+    setupIndependentScrollZones();
     await loadSuggestionHistory();
     await loadSavedProjectIfNeeded();
   </script>
