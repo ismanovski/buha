@@ -151,18 +151,22 @@
 }
 
   .container {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 320px;
+  display: flex;
   gap: 20px;
   width: calc(100% - 40px);
   max-width: 1500px;
   margin: 0 auto;
-  padding: 12px 0 20px;
-  align-items: start;
+  padding: 12px 20px 20px;
+  align-items: flex-start;
 }
 
   .left, .right {
     display: block;
+  }
+
+  .left {
+    flex: 1;
+    min-width: 0;
   }
 
   .panel {
@@ -242,7 +246,7 @@
   position: sticky;
   top: 20px;
   width: 320px;
-  justify-self: end;
+  flex-shrink: 0;
 }
 
   .right .panel {
@@ -281,7 +285,7 @@
 
   @media (max-width: 1024px) {
     .container {
-      grid-template-columns: 1fr;
+      flex-direction: column;
       width: calc(100% - 28px);
       gap: 14px;
     }
