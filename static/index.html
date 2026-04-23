@@ -149,54 +149,34 @@
     min-height: calc(100vh - 78px);
     margin: 0 auto;
     padding: 0;
-    background: #d9d9d9;
+    background: #ffffff;
   }
 
   .container {
-    position: relative;
     display: grid;
-    grid-template-columns: 240px 596px 330px;
-    justify-content: center;
-    gap: 28px;
+    grid-template-columns: 240px 120px 620px minmax(32px, 1fr) 300px;
+    gap: 0;
     width: 100%;
-    max-width: 1320px;
+    max-width: none;
     min-height: calc(100vh - 78px);
     margin: 0 auto;
-    padding: 40px 34px 48px;
+    padding: 0;
     box-sizing: border-box;
     align-items: start;
-  }
-
-  .container::before,
-  .container::after {
-    content: "";
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    background: #ffffff;
-    z-index: 0;
-  }
-
-  .container::before {
-    left: 258px;
-    width: 100px;
-  }
-
-  .container::after {
-    right: 0;
-    width: 140px;
   }
 
   .sidebar,
   .left,
   .right {
     display: block;
-    position: relative;
-    z-index: 1;
+    box-sizing: border-box;
   }
 
   .sidebar {
-    padding-top: 2px;
+    grid-column: 1;
+    background: #d9d9d9;
+    min-height: calc(100vh - 78px);
+    padding: 38px 20px 48px 28px;
   }
 
   .filter-toggle {
@@ -224,7 +204,7 @@
   }
 
   .balance-list {
-    margin-top: 26px;
+    margin-top: 24px;
   }
 
   .balance-item {
@@ -258,8 +238,11 @@
   }
 
   .left {
+    grid-column: 3;
     min-width: 0;
-    padding-top: 24px;
+    background: #d9d9d9;
+    min-height: calc(100vh - 78px);
+    padding: 52px 28px 48px;
   }
 
   .panel {
@@ -331,10 +314,12 @@
   }
 
   .right {
-    position: sticky;
-    top: 24px;
-    width: 330px;
-    padding-top: 74px;
+    grid-column: 5;
+    width: 100%;
+    align-self: start;
+    justify-self: end;
+    padding: 105px 0 48px 0;
+    background: transparent;
   }
 
   .right .panel {
@@ -382,17 +367,21 @@
       padding: 20px 0 28px;
     }
 
-    .container::before,
-    .container::after {
-      display: none;
-    }
-
     .sidebar,
     .left,
     .right {
       position: static;
       width: 100%;
       padding-top: 0;
+      min-height: auto;
+      grid-column: auto;
+    }
+
+    .sidebar,
+    .left,
+    .right {
+      padding: 0;
+      background: transparent;
     }
 
     .cards {
